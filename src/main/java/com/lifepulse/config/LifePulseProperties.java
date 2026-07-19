@@ -10,6 +10,7 @@ public class LifePulseProperties {
     private final Redis redis = new Redis();
     private final Mq mq = new Mq();
     private final Seckill seckill = new Seckill();
+    private final Ai ai = new Ai();
 
     public Jwt getJwt() {
         return jwt;
@@ -25,6 +26,10 @@ public class LifePulseProperties {
 
     public Seckill getSeckill() {
         return seckill;
+    }
+
+    public Ai getAi() {
+        return ai;
     }
 
     public static class Jwt {
@@ -90,6 +95,45 @@ public class LifePulseProperties {
 
         public void setLocalLockStripes(int localLockStripes) {
             this.localLockStripes = localLockStripes;
+        }
+    }
+
+    public static class Ai {
+        private boolean enabled = true;
+        private String apiKey;
+        private String baseUrl = "https://api.deepseek.com/chat/completions";
+        private String model = "deepseek-chat";
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getApiKey() {
+            return apiKey;
+        }
+
+        public void setApiKey(String apiKey) {
+            this.apiKey = apiKey;
+        }
+
+        public String getBaseUrl() {
+            return baseUrl;
+        }
+
+        public void setBaseUrl(String baseUrl) {
+            this.baseUrl = baseUrl;
+        }
+
+        public String getModel() {
+            return model;
+        }
+
+        public void setModel(String model) {
+            this.model = model;
         }
     }
 }

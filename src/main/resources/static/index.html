@@ -21,6 +21,7 @@
             <button class="nav-item" data-view="shops">商户探店</button>
             <button class="nav-item" data-view="vouchers">优惠券秒杀</button>
             <button class="nav-item" data-view="orders">我的订单</button>
+            <button class="nav-item" data-view="ai">AI 助手</button>
             <button class="nav-item" data-view="admin">运营看板</button>
         </nav>
         <div class="profile">
@@ -133,6 +134,33 @@
                     <button class="light block-button" onclick="loadDiagnosis()">重新诊断</button>
                 </div>
             </div>
+        </section>
+
+        <section class="panel hidden" data-view-panel="ai">
+            <div class="section-title">
+                <h3>AI 智能客服</h3>
+                <span>大模型 API + MCP 工具 + SSE 流式输出</span>
+            </div>
+            <div class="ai-layout">
+                <div class="chat-box" id="chatBox">
+                    <div class="chat-message assistant">
+                        <strong>LifePulse Assistant</strong>
+                        <p>你可以问我：有哪些优惠券、我的订单状态、为什么 Outbox 积压、现在运营风险怎么样。</p>
+                    </div>
+                </div>
+                <div class="ai-side">
+                    <h4>已封装工具</h4>
+                    <span>list_shops</span>
+                    <span>list_vouchers</span>
+                    <span>my_orders</span>
+                    <span>admin_stats</span>
+                    <span>ops_diagnosis</span>
+                </div>
+            </div>
+            <form class="chat-form" id="chatForm">
+                <input id="chatInput" placeholder="问一句，比如：帮我分析现在优惠券秒杀链路有没有风险" autocomplete="off">
+                <button type="submit">发送</button>
+            </form>
         </section>
 
         <div id="toast" class="toast"></div>

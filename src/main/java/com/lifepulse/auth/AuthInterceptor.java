@@ -18,6 +18,11 @@ public class AuthInterceptor implements HandlerInterceptor {
         String authorization = request.getHeader("Authorization");
         if (authorization != null && authorization.startsWith("Bearer ")) {
             UserContext.setClaims(jwtService.parseClaims(authorization.substring(7)));
+            return true;
+        }
+        String token = request.getParameter("token");
+        if (token != null && !token.isBlank()) {
+            UserContext.setClaims(jwtService.parseClaims(token));
         }
         return true;
     }

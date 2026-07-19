@@ -5,6 +5,9 @@ let authToken = "";
 const views = document.querySelectorAll("[data-view-panel]");
 const navItems = document.querySelectorAll(".nav-item");
 const toast = document.querySelector("#toast");
+const chatBox = document.querySelector("#chatBox");
+const chatForm = document.querySelector("#chatForm");
+const chatInput = document.querySelector("#chatInput");
 
 function showToast(message) {
     toast.textContent = message;
@@ -252,7 +255,48 @@ async function refreshAll() {
     }
 }
 
+function appendChat(role, content) {
+    const node = document.createElement("div");
+    node.className = `chat-message ${role}`;
+    node.innerHTML = `<strong>${role === "user" ? "我" : "LifePulse Assistant"}</strong><p>${content}</p>`;
+    chatBox.appendChild(node);
+    chatBox.scrollTop = chatBox.scrollHeight;
+    return node.querySelector("p");
+}
+
+function askAi(question) {
+    appendChat("user", question);
+    const answerNode = appendChat("assistant", "");
+    const url = `/api/ai/chat/stream?question=${encodeURIComponent(question)}&token=${encodeURIComponent(authToken)}`;
+    const source = new EventSource(url);
+    source.addEventListener("meta", event => {
+        answerNode.textContent += `[${event.data}]\n`;
+    });
+    source.addEventListener("message", event => {
+        answerNode.textContent += event.data;
+        chatBox.scrollTop = chatBox.scrollHeight;
+    });
+    source.addEventListener("done", () => {
+        source.close();
+    });
+    source.onerror = () => {
+        source.close();
+        if (!answerNode.textContent) {
+            answerNode.textContent = "AI 助手连接失败，请检查后端或 API Key。";
+        }
+    };
+}
+
 document.querySelector("#refreshBtn").addEventListener("click", refreshAll);
+chatForm.addEventListener("submit", event => {
+    event.preventDefault();
+    const question = chatInput.value.trim();
+    if (!question) {
+        return;
+    }
+    chatInput.value = "";
+    askAi(question);
+});
 document.querySelectorAll("[data-view-link]").forEach(button => {
     button.addEventListener("click", () => switchView(button.dataset.viewLink));
 });

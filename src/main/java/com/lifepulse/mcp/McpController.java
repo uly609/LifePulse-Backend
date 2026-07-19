@@ -2,6 +2,7 @@ package com.lifepulse.mcp;
 
 import com.lifepulse.admin.AdminController;
 import com.lifepulse.agent.OpsAgentService;
+import com.lifepulse.ai.AiAssistantService;
 import com.lifepulse.auth.CurrentUser;
 import com.lifepulse.common.BusinessException;
 import com.lifepulse.common.Result;
@@ -24,17 +25,20 @@ public class McpController {
     private final DealOrderService orderService;
     private final AdminController adminController;
     private final OpsAgentService opsAgentService;
+    private final AiAssistantService aiAssistantService;
 
     public McpController(ShopService shopService,
                          VoucherService voucherService,
                          DealOrderService orderService,
                          AdminController adminController,
-                         OpsAgentService opsAgentService) {
+                         OpsAgentService opsAgentService,
+                         AiAssistantService aiAssistantService) {
         this.shopService = shopService;
         this.voucherService = voucherService;
         this.orderService = orderService;
         this.adminController = adminController;
         this.opsAgentService = opsAgentService;
+        this.aiAssistantService = aiAssistantService;
     }
 
     @GetMapping("/api/mcp/tools")
@@ -63,7 +67,8 @@ public class McpController {
                 new McpTool("list_vouchers", "查询正在售卖的优惠券", objectSchema()),
                 new McpTool("my_orders", "查询当前登录用户的订单", objectSchema()),
                 new McpTool("admin_stats", "查询运营统计数据", objectSchema()),
-                new McpTool("ops_diagnosis", "诊断订单、库存和Outbox链路风险", objectSchema())
+                new McpTool("ops_diagnosis", "诊断订单、库存和Outbox链路风险", objectSchema()),
+                new McpTool("ai_chat", "调用大模型并结合业务工具回答用户问题", questionSchema())
         );
     }
 
@@ -78,11 +83,31 @@ public class McpController {
             case "my_orders" -> orderService.myOrders(CurrentUser.resolve(null));
             case "admin_stats" -> adminController.stats().data();
             case "ops_diagnosis" -> opsAgentService.diagnose();
+            case "ai_chat" -> aiAssistantService.chat(readQuestion(params));
             default -> throw new BusinessException("未知工具：" + name);
         };
     }
 
+    private String readQuestion(Map<String, Object> params) {
+        Object arguments = params.get("arguments");
+        if (arguments instanceof Map<?, ?> map) {
+            Object question = map.get("question");
+            if (question != null) {
+                return String.valueOf(question);
+            }
+        }
+        return "";
+    }
+
     private Map<String, Object> objectSchema() {
         return Map.of("type", "object", "properties", Map.of());
+    }
+
+    private Map<String, Object> questionSchema() {
+        return Map.of(
+                "type", "object",
+                "properties", Map.of("question", Map.of("type", "string", "description", "用户问题")),
+                "required", List.of("question")
+        );
     }
 }

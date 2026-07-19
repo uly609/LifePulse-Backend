@@ -469,6 +469,87 @@ td button {
     margin-top: 14px;
 }
 
+.ai-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 260px;
+    gap: 18px;
+}
+
+.chat-box {
+    height: 420px;
+    overflow: auto;
+    padding: 18px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #f8fafc;
+}
+
+.chat-message {
+    max-width: 82%;
+    padding: 13px 14px;
+    margin-bottom: 12px;
+    border-radius: 8px;
+    background: white;
+    border: 1px solid var(--line);
+}
+
+.chat-message.user {
+    margin-left: auto;
+    color: white;
+    background: var(--primary);
+    border-color: var(--primary);
+}
+
+.chat-message strong {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 13px;
+}
+
+.chat-message p {
+    margin: 0;
+    white-space: pre-wrap;
+    line-height: 1.65;
+}
+
+.ai-side {
+    display: grid;
+    align-content: start;
+    gap: 10px;
+    padding: 18px;
+    border: 1px solid #dfe7ff;
+    border-radius: 8px;
+    background: #f4f7ff;
+}
+
+.ai-side h4 {
+    margin: 0 0 4px;
+}
+
+.ai-side span {
+    padding: 9px 10px;
+    border-radius: 8px;
+    background: white;
+    color: var(--primary-dark);
+    font-weight: 800;
+    font-size: 13px;
+}
+
+.chat-form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 110px;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.chat-form input {
+    min-width: 0;
+    padding: 13px 14px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font: inherit;
+}
+
 .toast {
     position: fixed;
     right: 28px;
@@ -507,7 +588,8 @@ td button {
     }
 
     .hero,
-    .admin-grid {
+    .admin-grid,
+    .ai-layout {
         grid-template-columns: 1fr;
     }
 

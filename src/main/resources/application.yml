@@ -57,3 +57,8 @@ lifepulse:
   seckill:
     token-ttl-seconds: 60
     local-lock-stripes: 64
+  ai:
+    enabled: true
+    api-key: ${LIFEPULSE_AI_API_KEY:}
+    base-url: ${LIFEPULSE_AI_BASE_URL:https://api.deepseek.com/chat/completions}
+    model: ${LIFEPULSE_AI_MODEL:deepseek-chat}

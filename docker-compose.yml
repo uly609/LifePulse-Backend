@@ -67,6 +67,9 @@ services:
       - "8110:8110"
     environment:
       SPRING_PROFILES_ACTIVE: docker
+      LIFEPULSE_AI_API_KEY: ${LIFEPULSE_AI_API_KEY:-}
+      LIFEPULSE_AI_BASE_URL: ${LIFEPULSE_AI_BASE_URL:-https://api.deepseek.com/chat/completions}
+      LIFEPULSE_AI_MODEL: ${LIFEPULSE_AI_MODEL:-deepseek-chat}
 
   nginx:
     image: nginx:1.27

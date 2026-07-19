@@ -61,6 +61,8 @@ java -jar target/lifepulse-backend-0.0.1-SNAPSHOT.jar
 - `POST /api/orders/{orderId}/pay`
 - `POST /api/orders/{orderId}/cancel`
 - `POST /api/orders/{orderId}/refund`
+- `POST /api/ai/chat`
+- `GET /api/ai/chat/stream`
 - `GET /api/admin/stats`
 - `GET /api/agent/diagnosis`
 - `GET /api/outbox`
@@ -80,6 +82,18 @@ java -jar target/lifepulse-backend-0.0.1-SNAPSHOT.jar
 - 诊断内容：Outbox 积压、失败消息、待支付订单、低库存活动、评价量等
 
 它不是聊天玩具，定位是给智能客服或运营 Agent 调用的业务工具：Agent 通过 MCP 查询系统状态，再生成排查建议。
+
+## AI 智能客服
+
+项目接入 OpenAI 兼容格式的大模型 API，默认适配 DeepSeek：
+
+- 配置环境变量：`LIFEPULSE_AI_API_KEY`
+- 默认模型：`deepseek-chat`
+- 普通问答：`POST /api/ai/chat`
+- 流式输出：`GET /api/ai/chat/stream?question=...`
+- MCP 工具：`ai_chat`
+
+AI 助手会先根据用户问题调用项目内业务工具，拿到商户、优惠券、订单、运营统计或 Outbox 诊断上下文，再把上下文交给大模型生成自然语言回答。前端 AI 助手页使用 SSE 展示流式输出。
 
 ## 压测
 
