@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LifePulse 本地生活平台</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div class="shell">
+    <aside class="sidebar">
+        <div class="brand">
+            <span class="brand-mark">LP</span>
+            <div>
+                <strong>LifePulse</strong>
+                <small>本地生活交易平台</small>
+            </div>
+        </div>
+        <nav>
+            <button class="nav-item active" data-view="home">首页总览</button>
+            <button class="nav-item" data-view="shops">商户探店</button>
+            <button class="nav-item" data-view="vouchers">优惠券秒杀</button>
+            <button class="nav-item" data-view="orders">我的订单</button>
+            <button class="nav-item" data-view="admin">运营看板</button>
+        </nav>
+        <div class="profile">
+            <span>当前用户</span>
+            <strong>admin / 10003</strong>
+            <small>管理员演示账号，可查看运营诊断</small>
+        </div>
+    </aside>
+
+    <main class="main">
+        <header class="topbar">
+            <div>
+                <h1>本地生活拼团探店营销交易平台</h1>
+                <p>商户浏览、优惠券秒杀、订单支付取消、评价互动、MCP 工具调用和 Outbox 可靠消息演示。</p>
+            </div>
+            <button id="refreshBtn" class="ghost">刷新数据</button>
+        </header>
+
+        <section class="hero">
+            <div>
+                <span class="eyebrow">Java Backend Demo</span>
+                <h2>高并发抢券链路可视化</h2>
+                <p>前端点击“申请资格”拿到一次性 Token，再点击“立即抢券”，后端会走资格校验、预扣库存、Outbox 和订单创建。</p>
+                <div class="hero-actions">
+                    <button data-view-link="vouchers">去抢优惠券</button>
+                    <button data-view-link="orders" class="secondary">查看订单</button>
+                </div>
+            </div>
+            <div class="flow-card">
+                <span>JWT 鉴权</span>
+                <b>Redisson</b>
+                <span>资格 Token</span>
+                <b>Redis Lua</b>
+                <span>Outbox</span>
+                <b>RocketMQ</b>
+                <span>MCP / Nginx</span>
+            </div>
+        </section>
+
+        <section class="stats-grid" id="statsGrid"></section>
+
+        <section class="panel" data-view-panel="home">
+            <div class="section-title">
+                <h3>推荐商户</h3>
+                <span>按热度排序</span>
+            </div>
+            <div class="card-grid" id="homeShops"></div>
+        </section>
+
+        <section class="panel hidden" data-view-panel="shops">
+            <div class="section-title">
+                <h3>商户探店</h3>
+                <span>Caffeine 本地缓存承接热门详情</span>
+            </div>
+            <div class="card-grid" id="shopList"></div>
+        </section>
+
+        <section class="panel hidden" data-view-panel="vouchers">
+            <div class="section-title">
+                <h3>优惠券秒杀</h3>
+                <span>先申请资格 Token，再抢券</span>
+            </div>
+            <div class="card-grid" id="voucherList"></div>
+        </section>
+
+        <section class="panel hidden" data-view-panel="orders">
+            <div class="section-title">
+                <h3>我的订单</h3>
+                <span>支付、取消、退款都走条件更新</span>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>订单ID</th>
+                        <th>券ID</th>
+                        <th>金额</th>
+                        <th>状态</th>
+                        <th>创建时间</th>
+                        <th>操作</th>
+                    </tr>
+                    </thead>
+                    <tbody id="orderRows"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="panel hidden" data-view-panel="admin">
+            <div class="section-title">
+                <h3>运营看板</h3>
+                <span>订单与 Outbox 状态</span>
+            </div>
+            <div class="admin-grid">
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>Outbox ID</th>
+                            <th>事件</th>
+                            <th>Topic</th>
+                            <th>状态</th>
+                        </tr>
+                        </thead>
+                        <tbody id="outboxRows"></tbody>
+                    </table>
+                </div>
+                <div class="assistant-box">
+                    <h4>AI 运营诊断</h4>
+                    <div id="diagnosisBox" class="diagnosis-box">正在分析订单、库存和消息链路...</div>
+                    <button class="light block-button" onclick="loadDiagnosis()">重新诊断</button>
+                </div>
+            </div>
+        </section>
+
+        <div id="toast" class="toast"></div>
+    </main>
+</div>
+<script src="/app.js"></script>
+</body>
+</html>

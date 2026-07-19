@@ -1,0 +1,109 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: lifepulse-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: lifepulse
+      MYSQL_USER: lifepulse
+      MYSQL_PASSWORD: lifepulse123
+    ports:
+      - "3307:3306"
+    volumes:
+      - lifepulse_mysql_data:/var/lib/mysql
+      - ./deploy/mysql-init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7
+    container_name: lifepulse-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - lifepulse_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  rocketmq-namesrv:
+    image: apache/rocketmq:5.3.0
+    container_name: lifepulse-rocketmq-namesrv
+    command: ["sh", "mqnamesrv"]
+    ports:
+      - "9876:9876"
+
+  rocketmq-broker:
+    image: apache/rocketmq:5.3.0
+    container_name: lifepulse-rocketmq-broker
+    user: root
+    command: ["sh", "mqbroker", "-n", "rocketmq-namesrv:9876", "-c", "/home/rocketmq/rocketmq-5.3.0/conf/broker.conf"]
+    depends_on:
+      - rocketmq-namesrv
+    ports:
+      - "10909:10909"
+      - "10911:10911"
+    volumes:
+      - ./deploy/rocketmq-broker.conf:/home/rocketmq/rocketmq-5.3.0/conf/broker.conf:ro
+      - lifepulse_rocketmq_store:/home/rocketmq/store
+
+  app:
+    build: .
+    container_name: lifepulse-app
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rocketmq-broker:
+        condition: service_started
+    ports:
+      - "8110:8110"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+
+  nginx:
+    image: nginx:1.27
+    container_name: lifepulse-nginx
+    depends_on:
+      - app
+    ports:
+      - "8088:80"
+    volumes:
+      - ./deploy/nginx-docker.conf:/etc/nginx/conf.d/default.conf:ro
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: lifepulse-prometheus
+    depends_on:
+      - app
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: lifepulse-grafana
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+      - lifepulse_grafana_data:/var/lib/grafana
+
+volumes:
+  lifepulse_mysql_data:
+  lifepulse_redis_data:
+  lifepulse_rocketmq_store:
+  lifepulse_grafana_data:

@@ -1,0 +1,59 @@
+server:
+  port: 8110
+
+spring:
+  application:
+    name: lifepulse-backend
+  datasource:
+    driver-class-name: org.h2.Driver
+    url: jdbc:h2:mem:lifepulse;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:sql/schema.sql
+      data-locations: classpath:sql/data.sql
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 2s
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    banner: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+rocketmq:
+  name-server: localhost:9876
+  producer:
+    group: lifepulse-producer-group
+
+lifepulse:
+  jwt:
+    # 本地演示密钥；真实上线放环境变量或配置中心
+    secret: "LifePulseLocalJwtSecretKey-ChangeMe-2026"
+    ttl-seconds: 7200
+  redis:
+    enabled: false
+  mq:
+    enabled: false
+  seckill:
+    token-ttl-seconds: 60
+    local-lock-stripes: 64

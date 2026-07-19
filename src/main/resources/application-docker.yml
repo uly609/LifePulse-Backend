@@ -1,0 +1,47 @@
+server:
+  port: 8110
+
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://mysql:3306/lifepulse?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+    username: lifepulse
+    password: lifepulse123
+  sql:
+    init:
+      mode: never
+  h2:
+    console:
+      enabled: false
+  data:
+    redis:
+      host: redis
+      port: 6379
+      timeout: 2s
+
+rocketmq:
+  name-server: rocketmq-namesrv:9876
+  producer:
+    group: lifepulse-producer-group
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+lifepulse:
+  jwt:
+    secret: "LifePulseDockerJwtSecretKey-ChangeMe-2026"
+    ttl-seconds: 7200
+  redis:
+    enabled: true
+  mq:
+    enabled: true
+  seckill:
+    token-ttl-seconds: 60
+    local-lock-stripes: 64
