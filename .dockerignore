@@ -5,3 +5,5 @@ target/maven-status
 target/surefire-reports
 *.log
 .DS_Store
+frontend/node_modules
+frontend/dist

@@ -18,7 +18,7 @@ docker compose up -d --build
 
 启动后访问：
 
-- 前端页面：`http://localhost:8088/`
+- Vue 前端页面：`http://localhost:8088/`
 - 后端直连：`http://localhost:8110/`
 - Prometheus：`http://localhost:9090/`
 - Grafana：`http://localhost:3000/`，默认账号 `admin/admin`
@@ -47,8 +47,24 @@ mvn -q -DskipTests package
 java -jar target/lifepulse-backend-0.0.1-SNAPSHOT.jar
 ```
 
-轻量模式默认使用 H2 内存数据库，端口 `8110`。
-打开 `http://localhost:8110/` 可以直接访问前端页面。
+轻量模式默认使用 H2 内存数据库，端口 `8110`，只提供后端 API。
+前端请在 `frontend/` 目录单独启动 Vue 开发服务。
+
+## Vue 前端开发
+
+前端在 `frontend/` 目录，使用 Vue 3 + Vite：
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+本地开发时可以把接口地址配置为：
+
+```bash
+VITE_API_BASE=http://localhost:8110 npm run dev
+```
 
 ## 主要接口
 
@@ -71,7 +87,7 @@ java -jar target/lifepulse-backend-0.0.1-SNAPSHOT.jar
 
 ## 面试重点
 
-这个项目不是只做 CRUD，重点是交易系统里的并发和一致性：JWT 无状态登录、RBAC 角色校验、Redis Lua 预扣、Redisson 用户维度锁、RocketMQ 削峰、Outbox 防消息丢失、MySQL 事务兜底、唯一索引和条件更新保证幂等。Docker Compose 会把 MySQL、Redis、RocketMQ、Nginx、Prometheus、Grafana 和后端服务一起编排起来。
+这个项目不是只做 CRUD，重点是交易系统里的并发和一致性：Vue 3 前端、JWT 无状态登录、RBAC 角色校验、Redis Lua 预扣、Redisson 用户维度锁、RocketMQ 削峰、Outbox 防消息丢失、MySQL 事务兜底、唯一索引和条件更新保证幂等。Docker Compose 会把 MySQL、Redis、RocketMQ、Vue/Nginx、Prometheus、Grafana 和后端服务一起编排起来。
 
 ## 运营诊断 Agent
 

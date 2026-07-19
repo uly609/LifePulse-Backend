@@ -17,5 +17,7 @@ target/
 node_modules/
 dist/
 coverage/
+frontend/node_modules/
+frontend/dist/
 
 docker-data/
