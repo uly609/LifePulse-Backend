@@ -54,6 +54,7 @@ public class VoucherService {
             """, Long.class);
 
     private final VoucherMapper voucherMapper;
+    private final VoucherBloomFilter voucherBloomFilter;
     private final OutboxEventService outboxEventService;
     private final OrderProcessor orderProcessor;
     private final StringRedisTemplate redisTemplate;
@@ -65,6 +66,7 @@ public class VoucherService {
     private final ReentrantLock[] localLocks;
 
     public VoucherService(VoucherMapper voucherMapper,
+                          VoucherBloomFilter voucherBloomFilter,
                           OutboxEventService outboxEventService,
                           OrderProcessor orderProcessor,
                           StringRedisTemplate redisTemplate,
@@ -72,6 +74,7 @@ public class VoucherService {
                           LifePulseProperties properties,
                           ObjectProvider<RedissonClient> redissonClientProvider) {
         this.voucherMapper = voucherMapper;
+        this.voucherBloomFilter = voucherBloomFilter;
         this.outboxEventService = outboxEventService;
         this.orderProcessor = orderProcessor;
         this.redisTemplate = redisTemplate;
@@ -145,6 +148,9 @@ public class VoucherService {
     }
 
     private Voucher requireSellingVoucher(Long voucherId) {
+        if (!voucherBloomFilter.mightContain(voucherId)) {
+            throw new BusinessException("优惠券不存在或未开售");
+        }
         Voucher voucher = voucherMapper.selectById(voucherId);
         LocalDateTime now = LocalDateTime.now();
         if (voucher == null || !"SELLING".equals(voucher.getStatus())) {
