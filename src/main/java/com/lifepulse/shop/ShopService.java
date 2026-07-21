@@ -3,21 +3,24 @@ package com.lifepulse.shop;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.lifepulse.infrastructure.cache.LocalCacheTemplate;
 import com.lifepulse.config.policy.RuntimePolicy;
 import com.lifepulse.entity.Shop;
 import com.lifepulse.mapper.ShopMapper;
 import org.springframework.stereotype.Service;
 
-import java.time.Instant;
+import java.time.Duration;
 import java.util.List;
 
 @Service
 public class ShopService {
     private final ShopMapper shopMapper;
-    private final Cache<Long, CachedShop> shopCache = Caffeine.newBuilder().maximumSize(1000).build();
+    private final LocalCacheTemplate cacheTemplate;
+    private final Cache<Long, LocalCacheTemplate.CacheEntry<Shop>> shopCache = Caffeine.newBuilder().maximumSize(1000).build();
 
-    public ShopService(ShopMapper shopMapper) {
+    public ShopService(ShopMapper shopMapper, LocalCacheTemplate cacheTemplate) {
         this.shopMapper = shopMapper;
+        this.cacheTemplate = cacheTemplate;
     }
 
     public List<Shop> listHot() {
@@ -27,20 +30,11 @@ public class ShopService {
     }
 
     public Shop detail(Long id) {
-        CachedShop cached = shopCache.getIfPresent(id);
-        if (cached != null && cached.expiresAt().isAfter(Instant.now())) {
-            return cached.shop();
-        }
-        Shop shop = shopMapper.selectById(id);
-        if (shop != null) {
-            shopCache.put(id, new CachedShop(shop, Instant.now().plusSeconds(RuntimePolicy.current().shopCacheTtlSeconds())));
-        }
-        return shop;
+        Duration ttl = Duration.ofSeconds(RuntimePolicy.current().shopCacheTtlSeconds());
+        return cacheTemplate.getFromCacheOrDb(shopCache, id, ttl, () -> shopMapper.selectById(id));
     }
 
     public void evict(Long shopId) {
-        shopCache.invalidate(shopId);
+        cacheTemplate.evict(shopCache, shopId);
     }
-
-    private record CachedShop(Shop shop, Instant expiresAt) { }
 }

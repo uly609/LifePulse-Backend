@@ -87,7 +87,7 @@ VITE_API_BASE=http://localhost:8110 npm run dev
 
 ## 面试重点
 
-这个项目不是只做 CRUD，重点是交易系统里的并发和一致性：Vue 3 前端、JWT 无状态登录、RBAC 角色校验、Redis Lua 预扣、Redisson 用户维度锁、RocketMQ 削峰、Outbox 防消息丢失、MySQL 事务兜底、唯一索引和条件更新保证幂等。Docker Compose 会把 MySQL、Redis、RocketMQ、Vue/Nginx、Prometheus、Grafana 和后端服务一起编排起来。
+这个项目不是只做 CRUD，重点是交易系统里的并发和一致性：Vue 3 前端、JWT 无状态登录、RBAC 角色校验、Caffeine + Redis 通用缓存抽象、Redis Lua 预扣、Redisson 用户维度锁、RocketMQ 削峰、Outbox 防消息丢失、MySQL 事务兜底、订单状态机和拼团资格规则链保证幂等与可解释性。Docker Compose 会把 MySQL、Redis、RocketMQ、Vue/Nginx、Prometheus、Grafana 和后端服务一起编排起来。
 
 ## 运营诊断 Agent
 

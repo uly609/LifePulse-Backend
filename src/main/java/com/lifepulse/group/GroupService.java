@@ -19,6 +19,8 @@ import com.lifepulse.mapper.VoucherMapper;
 import com.lifepulse.notification.NotifyTaskService;
 import com.lifepulse.order.OrderStatus;
 import com.lifepulse.outbox.OutboxEventService;
+import com.lifepulse.group.rule.GroupJoinContext;
+import com.lifepulse.group.rule.GroupJoinRuleChain;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -44,12 +46,14 @@ public class GroupService {
     private final IdGenerator ids;
     private final NotifyTaskService notifications;
     private final OutboxEventService outbox;
+    private final GroupJoinRuleChain joinRuleChain;
     private final Executor groupDetailExecutor;
 
     public GroupService(GroupActivityMapper activityMapper, GroupTeamMapper teamMapper,
                         GroupMemberMapper memberMapper, DealOrderMapper orderMapper,
                         VoucherMapper voucherMapper, ShopMapper shopMapper, IdGenerator ids,
                         NotifyTaskService notifications, OutboxEventService outbox,
+                        GroupJoinRuleChain joinRuleChain,
                         @Qualifier("groupDetailExecutor") Executor groupDetailExecutor) {
         this.activityMapper = activityMapper;
         this.teamMapper = teamMapper;
@@ -60,6 +64,7 @@ public class GroupService {
         this.ids = ids;
         this.notifications = notifications;
         this.outbox = outbox;
+        this.joinRuleChain = joinRuleChain;
         this.groupDetailExecutor = groupDetailExecutor;
     }
 
@@ -89,7 +94,7 @@ public class GroupService {
             return List.of();
         });
         CompletableFuture<GroupEligibility> eligibilityFuture = CompletableFuture.supplyAsync(
-                () -> eligibility(activity, userId, role), groupDetailExecutor
+                () -> joinRuleChain.evaluate(new GroupJoinContext(activity, userId, role)), groupDetailExecutor
         ).exceptionally(error -> {
             log.warn("group_detail_eligibility_failed activityId={}", activityId, error);
             return new GroupEligibility(false, false, "资格查询暂不可用");
@@ -217,17 +222,9 @@ public class GroupService {
     private List<GroupMember> members(Long groupId) { return memberMapper.selectList(new LambdaQueryWrapper<GroupMember>().eq(GroupMember::getGroupId, groupId)); }
     private GroupActivity checkJoin(Long id, Long user, String role) {
         GroupActivity activity = requireActivity(id);
-        GroupEligibility eligibility = eligibility(activity, user, role);
+        GroupEligibility eligibility = joinRuleChain.evaluate(new GroupJoinContext(activity, user, role));
         if (!eligibility.eligible()) throw new BusinessException(eligibility.reason());
         return activity;
-    }
-    private GroupEligibility eligibility(GroupActivity activity, Long userId, String role) {
-        if (userId == null) return new GroupEligibility(false, false, "登录后可参加拼团");
-        boolean joined = memberMapper.selectCount(new LambdaQueryWrapper<GroupMember>().eq(GroupMember::getActivityId, activity.getId()).eq(GroupMember::getUserId, userId)) > 0;
-        if (joined) return new GroupEligibility(false, true, "你已参加该活动");
-        if (!"ALL".equals(activity.getAllowedRole()) && !activity.getAllowedRole().equals(role)) return new GroupEligibility(false, false, "当前账号不满足活动参与资格");
-        if (activity.getJoinedCount() >= activity.getTotalStock()) return new GroupEligibility(false, false, "活动名额已满");
-        return new GroupEligibility(true, false, "可以参加");
     }
     private GroupActivity requireActivity(Long id) {
         GroupActivity activity = activityMapper.selectById(id);
