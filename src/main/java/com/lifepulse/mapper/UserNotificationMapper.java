@@ -1,0 +1,1 @@
+package com.lifepulse.mapper; import com.baomidou.mybatisplus.core.mapper.BaseMapper; import com.lifepulse.entity.UserNotification; public interface UserNotificationMapper extends BaseMapper<UserNotification> {}

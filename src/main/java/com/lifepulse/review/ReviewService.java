@@ -1,6 +1,8 @@
 package com.lifepulse.review;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.lifepulse.common.BusinessException;
 import com.lifepulse.common.IdGenerator;
 import com.lifepulse.entity.Shop;
 import com.lifepulse.entity.ShopReview;
@@ -34,6 +36,15 @@ public class ReviewService {
     @Transactional(rollbackFor = Exception.class)
     public void publish(Long shopId, Long userId, ReviewRequest request) {
         Shop shop = shopMapper.selectById(shopId);
+        if (shop == null) {
+            throw new BusinessException("商户不存在");
+        }
+        Long reviewCount = reviewMapper.selectCount(new LambdaQueryWrapper<ShopReview>()
+                .eq(ShopReview::getShopId, shopId)
+                .eq(ShopReview::getUserId, userId));
+        if (reviewCount > 0) {
+            throw new BusinessException("你已评价过该商户，请勿重复发布");
+        }
         int oldCount = shop.getCommentCount();
         BigDecimal oldTotal = shop.getAvgScore().multiply(BigDecimal.valueOf(oldCount));
         BigDecimal newAvg = oldTotal.add(BigDecimal.valueOf(request.score()))

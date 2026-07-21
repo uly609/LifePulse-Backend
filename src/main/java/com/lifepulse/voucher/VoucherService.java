@@ -6,6 +6,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lifepulse.common.BusinessException;
 import com.lifepulse.config.LifePulseProperties;
+import com.lifepulse.config.policy.RuntimePolicy;
 import com.lifepulse.config.RocketTopics;
 import com.lifepulse.entity.Voucher;
 import com.lifepulse.mapper.VoucherMapper;
@@ -17,6 +18,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -122,7 +124,11 @@ public class VoucherService {
         return new QualificationResponse(token, properties.getSeckill().getTokenTtlSeconds());
     }
 
+    @Transactional(rollbackFor = Exception.class)
     public EnrollResponse seckill(Long voucherId, Long userId, String qualificationToken) {
+        if (!RuntimePolicy.current().seckillEnabled()) {
+            throw new BusinessException("秒杀活动维护中，请稍后再试");
+        }
         Voucher voucher = requireSellingVoucher(voucherId);
         if (qualificationToken == null || qualificationToken.isBlank()) {
             throw new BusinessException("请先申请抢券资格");

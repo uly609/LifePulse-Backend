@@ -11,6 +11,8 @@ public class LifePulseProperties {
     private final Mq mq = new Mq();
     private final Seckill seckill = new Seckill();
     private final Ai ai = new Ai();
+    private final Nacos nacos = new Nacos();
+    private final Cdc cdc = new Cdc();
 
     public Jwt getJwt() {
         return jwt;
@@ -30,6 +32,29 @@ public class LifePulseProperties {
 
     public Ai getAi() {
         return ai;
+    }
+
+    public Nacos getNacos() { return nacos; }
+    public Cdc getCdc() { return cdc; }
+    public static class Cdc {
+        private boolean enabled;
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean enabled) { this.enabled = enabled; }
+    }
+
+    public static class Nacos {
+        private boolean enabled;
+        private String serverAddr = "http://localhost:8848";
+        private String dataId = "lifepulse-policy.yaml";
+        private String group = "DEFAULT_GROUP";
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean enabled) { this.enabled = enabled; }
+        public String getServerAddr() { return serverAddr; }
+        public void setServerAddr(String serverAddr) { this.serverAddr = serverAddr; }
+        public String getDataId() { return dataId; }
+        public void setDataId(String dataId) { this.dataId = dataId; }
+        public String getGroup() { return group; }
+        public void setGroup(String group) { this.group = group; }
     }
 
     public static class Jwt {

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <property name="LOG_PATH" value="${LOG_PATH:-./logs}"/>
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder><pattern>%d{HH:mm:ss.SSS} %-5level [%X{traceId:-}] [%X{userId:-}] %logger{36} - %msg%n</pattern></encoder>
+    </appender>
+    <appender name="JSON_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/lifepulse.json</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/lifepulse.%d{yyyy-MM-dd}.json</fileNamePattern>
+            <maxHistory>7</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <pattern>{"timestamp":"%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX}","level":"%level","traceId":"%X{traceId:-}","userId":"%X{userId:-}","logger":"%logger{36}","message":"%replace(%msg){'"','\\"'}"}%n</pattern>
+        </encoder>
+    </appender>
+    <root level="INFO"><appender-ref ref="CONSOLE"/><appender-ref ref="JSON_FILE"/></root>
+</configuration>

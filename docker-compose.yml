@@ -32,6 +32,17 @@ services:
       timeout: 3s
       retries: 20
 
+  nacos:
+    image: nacos/nacos-server:v2.4.2
+    container_name: lifepulse-nacos
+    environment:
+      MODE: standalone
+      NACOS_AUTH_ENABLE: "false"
+      JVM_XMS: 256m
+      JVM_XMX: 256m
+    ports:
+      - "8848:8848"
+
   rocketmq-namesrv:
     image: apache/rocketmq:5.3.0
     container_name: lifepulse-rocketmq-namesrv
@@ -63,13 +74,18 @@ services:
         condition: service_healthy
       rocketmq-broker:
         condition: service_started
+      nacos:
+        condition: service_started
     ports:
       - "8110:8110"
     environment:
       SPRING_PROFILES_ACTIVE: docker
+      LOG_PATH: /app/logs
       LIFEPULSE_AI_API_KEY: ${LIFEPULSE_AI_API_KEY:-}
       LIFEPULSE_AI_BASE_URL: ${LIFEPULSE_AI_BASE_URL:-https://api.deepseek.com/chat/completions}
       LIFEPULSE_AI_MODEL: ${LIFEPULSE_AI_MODEL:-deepseek-chat}
+    volumes:
+      - lifepulse_app_logs:/app/logs
 
   nginx:
     build:
@@ -104,8 +120,41 @@ services:
       - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
       - lifepulse_grafana_data:/var/lib/grafana
 
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
+    container_name: lifepulse-elasticsearch
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - lifepulse_elasticsearch_data:/usr/share/elasticsearch/data
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.15.3
+    container_name: lifepulse-logstash
+    depends_on:
+      - elasticsearch
+    volumes:
+      - ./deploy/logstash/pipeline.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+      - lifepulse_app_logs:/usr/share/logstash/app-logs:ro
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.15.3
+    container_name: lifepulse-kibana
+    depends_on:
+      - elasticsearch
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+
 volumes:
   lifepulse_mysql_data:
   lifepulse_redis_data:
   lifepulse_rocketmq_store:
   lifepulse_grafana_data:
+  lifepulse_app_logs:
+  lifepulse_elasticsearch_data:

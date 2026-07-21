@@ -27,15 +27,13 @@ public class VoucherController {
     }
 
     @PostMapping("/{voucherId}/qualification")
-    public Result<QualificationResponse> applyQualification(@PathVariable Long voucherId,
-                                                            @RequestParam(required = false) Long userId) {
-        return Result.success(voucherService.applyQualification(voucherId, CurrentUser.resolve(userId)));
+    public Result<QualificationResponse> applyQualification(@PathVariable Long voucherId) {
+        return Result.success(voucherService.applyQualification(voucherId, CurrentUser.resolve(null)));
     }
 
     @PostMapping("/{voucherId}/seckill")
     public Result<EnrollResponse> seckill(@PathVariable Long voucherId,
-                                          @RequestParam(required = false) Long userId,
                                           @RequestParam String qualificationToken) {
-        return Result.success(voucherService.seckill(voucherId, CurrentUser.resolve(userId), qualificationToken));
+        return Result.success(voucherService.seckill(voucherId, CurrentUser.resolve(null), qualificationToken));
     }
 }

@@ -3,20 +3,18 @@ package com.lifepulse.shop;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.lifepulse.config.policy.RuntimePolicy;
 import com.lifepulse.entity.Shop;
 import com.lifepulse.mapper.ShopMapper;
 import org.springframework.stereotype.Service;
 
-import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 
 @Service
 public class ShopService {
     private final ShopMapper shopMapper;
-    private final Cache<Long, Shop> shopCache = Caffeine.newBuilder()
-            .maximumSize(1000)
-            .expireAfterWrite(Duration.ofMinutes(10))
-            .build();
+    private final Cache<Long, CachedShop> shopCache = Caffeine.newBuilder().maximumSize(1000).build();
 
     public ShopService(ShopMapper shopMapper) {
         this.shopMapper = shopMapper;
@@ -29,13 +27,13 @@ public class ShopService {
     }
 
     public Shop detail(Long id) {
-        Shop cached = shopCache.getIfPresent(id);
-        if (cached != null) {
-            return cached;
+        CachedShop cached = shopCache.getIfPresent(id);
+        if (cached != null && cached.expiresAt().isAfter(Instant.now())) {
+            return cached.shop();
         }
         Shop shop = shopMapper.selectById(id);
         if (shop != null) {
-            shopCache.put(id, shop);
+            shopCache.put(id, new CachedShop(shop, Instant.now().plusSeconds(RuntimePolicy.current().shopCacheTtlSeconds())));
         }
         return shop;
     }
@@ -43,4 +41,6 @@ public class ShopService {
     public void evict(Long shopId) {
         shopCache.invalidate(shopId);
     }
+
+    private record CachedShop(Shop shop, Instant expiresAt) { }
 }

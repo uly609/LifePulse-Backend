@@ -11,12 +11,17 @@ import org.apache.rocketmq.client.producer.SendResult;
 import org.apache.rocketmq.spring.core.RocketMQTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
 public class OutboxEventService {
+    private static final Logger log = LoggerFactory.getLogger(OutboxEventService.class);
     private static final String PENDING = "PENDING";
     private static final String SENT = "SENT";
     private static final String FAILED = "FAILED";
@@ -43,7 +48,21 @@ public class OutboxEventService {
             markSent(event.getId());
             return;
         }
-        rocketMQTemplate.asyncSend(topic, payload, new SendCallback() {
+        // A consumer must never observe an event for a database transaction that later rolls back.
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    sendAsync(event);
+                }
+            });
+        } else {
+            sendAsync(event);
+        }
+    }
+
+    private void sendAsync(OutboxEvent event) {
+        rocketMQTemplate.asyncSend(event.getTopic(), event.getPayload(), new SendCallback() {
             @Override
             public void onSuccess(SendResult sendResult) {
                 markSent(event.getId());
@@ -72,17 +91,7 @@ public class OutboxEventService {
                 .le(OutboxEvent::getNextRetryTime, LocalDateTime.now())
                 .last("limit 20"));
         for (OutboxEvent event : events) {
-            rocketMQTemplate.asyncSend(event.getTopic(), event.getPayload(), new SendCallback() {
-                @Override
-                public void onSuccess(SendResult sendResult) {
-                    markSent(event.getId());
-                }
-
-                @Override
-                public void onException(Throwable throwable) {
-                    markFailed(event.getId(), throwable.getMessage());
-                }
-            });
+            sendAsync(event);
         }
     }
 
@@ -108,6 +117,7 @@ public class OutboxEventService {
                 .eq(OutboxEvent::getId, id)
                 .set(OutboxEvent::getStatus, SENT)
                 .set(OutboxEvent::getUpdatedAt, LocalDateTime.now()));
+        log.info("outbox_sent eventId={}", id);
     }
 
     private void markFailed(Long id, String error) {
@@ -118,5 +128,6 @@ public class OutboxEventService {
                 .set(OutboxEvent::getNextRetryTime, LocalDateTime.now().plusSeconds(10))
                 .set(OutboxEvent::getErrorMessage, error == null ? "send failed" : error)
                 .set(OutboxEvent::getUpdatedAt, LocalDateTime.now()));
+        log.warn("outbox_failed eventId={} error={}", id, error);
     }
 }

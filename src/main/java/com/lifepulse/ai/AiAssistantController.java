@@ -36,7 +36,8 @@ public class AiAssistantController {
                 emitter.send(SseEmitter.event().name("meta").data(response.contextSummary()));
                 for (String chunk : response.answer().split("(?<=。|！|？|\\n)")) {
                     if (!chunk.isBlank()) {
-                        emitter.send(SseEmitter.event().name("message").data(chunk));
+                        // 默认 SSE message 事件能被浏览器的 EventSource.onmessage 稳定接收。
+                        emitter.send(SseEmitter.event().data(chunk));
                         Thread.sleep(80);
                     }
                 }
@@ -46,7 +47,7 @@ public class AiAssistantController {
                 emitter.completeWithError(e);
             } catch (Exception e) {
                 try {
-                    emitter.send(SseEmitter.event().name("message").data("AI助手异常：" + e.getMessage()));
+                    emitter.send(SseEmitter.event().data("客服暂时无法回复，请稍后再试。"));
                 } catch (IOException ignored) {
                 }
                 emitter.complete();

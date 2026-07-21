@@ -4,6 +4,7 @@ import com.lifepulse.admin.AdminController;
 import com.lifepulse.agent.OpsAgentService;
 import com.lifepulse.ai.AiAssistantService;
 import com.lifepulse.auth.CurrentUser;
+import com.lifepulse.auth.UserContext;
 import com.lifepulse.common.BusinessException;
 import com.lifepulse.common.Result;
 import com.lifepulse.order.DealOrderService;
@@ -62,13 +63,20 @@ public class McpController {
     }
 
     private List<McpTool> tools() {
-        return List.of(
+        List<McpTool> customerTools = List.of(
                 new McpTool("list_shops", "查询热门商户列表", objectSchema()),
                 new McpTool("list_vouchers", "查询正在售卖的优惠券", objectSchema()),
                 new McpTool("my_orders", "查询当前登录用户的订单", objectSchema()),
+                new McpTool("ai_chat", "调用大模型并结合业务工具回答用户问题", questionSchema())
+        );
+        if (!isOperator()) {
+            return customerTools;
+        }
+        return List.of(
+                customerTools.get(0), customerTools.get(1), customerTools.get(2),
                 new McpTool("admin_stats", "查询运营统计数据", objectSchema()),
                 new McpTool("ops_diagnosis", "诊断订单、库存和Outbox链路风险", objectSchema()),
-                new McpTool("ai_chat", "调用大模型并结合业务工具回答用户问题", questionSchema())
+                customerTools.get(3)
         );
     }
 
@@ -81,8 +89,14 @@ public class McpController {
             case "list_shops" -> shopService.listHot();
             case "list_vouchers" -> voucherService.listSelling();
             case "my_orders" -> orderService.myOrders(CurrentUser.resolve(null));
-            case "admin_stats" -> adminController.stats().data();
-            case "ops_diagnosis" -> opsAgentService.diagnose();
+            case "admin_stats" -> {
+                requireOperator();
+                yield adminController.stats().data();
+            }
+            case "ops_diagnosis" -> {
+                requireOperator();
+                yield opsAgentService.diagnose();
+            }
             case "ai_chat" -> aiAssistantService.chat(readQuestion(params));
             default -> throw new BusinessException("未知工具：" + name);
         };
@@ -109,5 +123,15 @@ public class McpController {
                 "properties", Map.of("question", Map.of("type", "string", "description", "用户问题")),
                 "required", List.of("question")
         );
+    }
+
+    private boolean isOperator() {
+        return "ADMIN".equals(UserContext.getRole()) || "MERCHANT".equals(UserContext.getRole());
+    }
+
+    private void requireOperator() {
+        if (!isOperator()) {
+            throw new BusinessException("当前账号无运营权限");
+        }
     }
 }

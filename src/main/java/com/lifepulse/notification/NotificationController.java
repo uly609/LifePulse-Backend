@@ -1,0 +1,3 @@
+package com.lifepulse.notification;
+import com.lifepulse.auth.CurrentUser;import com.lifepulse.common.Result;import com.lifepulse.entity.UserNotification;import org.springframework.web.bind.annotation.*;import java.util.List;
+@RestController @RequestMapping("/api/notifications") public class NotificationController {private final NotificationService s;public NotificationController(NotificationService s){this.s=s;}@GetMapping public Result<List<UserNotification>> mine(){return Result.success(s.mine(CurrentUser.resolve(null)));}@PostMapping("/{id}/read") public Result<Void> read(@PathVariable Long id){s.read(id,CurrentUser.resolve(null));return Result.success(null);}}

@@ -62,3 +62,8 @@ lifepulse:
     api-key: ${LIFEPULSE_AI_API_KEY:}
     base-url: ${LIFEPULSE_AI_BASE_URL:https://api.deepseek.com/chat/completions}
     model: ${LIFEPULSE_AI_MODEL:deepseek-chat}
+  nacos:
+    enabled: false
+    server-addr: ${LIFEPULSE_NACOS_ADDR:http://localhost:8848}
+  cdc:
+    enabled: false

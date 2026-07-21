@@ -22,6 +22,109 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 
+.auth-page {
+    display: grid;
+    min-height: 100vh;
+    place-items: center;
+    padding: 24px;
+    background: #f5f7fb;
+}
+
+.auth-panel {
+    display: grid;
+    width: min(100%, 420px);
+    gap: 14px;
+    padding: 32px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--panel);
+    box-shadow: 0 18px 44px rgba(23, 32, 51, .08);
+}
+
+.auth-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.auth-brand strong,
+.auth-brand small {
+    display: block;
+}
+
+.auth-brand small,
+.auth-panel > p,
+.auth-note {
+    color: var(--muted);
+}
+
+.auth-panel h1,
+.auth-panel p {
+    margin: 0;
+}
+
+.auth-panel h1 {
+    font-size: 26px;
+}
+
+.auth-panel > p {
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.auth-switch {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    padding: 3px;
+    border-radius: 8px;
+    background: #edf1f7;
+}
+
+.auth-switch button {
+    padding: 9px;
+    color: var(--muted);
+    background: transparent;
+    box-shadow: none;
+}
+
+.auth-switch button.active {
+    color: var(--primary);
+    background: white;
+}
+
+.auth-panel label {
+    display: grid;
+    gap: 7px;
+    color: #3b465a;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.auth-panel input {
+    width: 100%;
+    padding: 11px 12px;
+    border: 1px solid #cfd8eb;
+    border-radius: 8px;
+    color: var(--text);
+    font: inherit;
+}
+
+.auth-panel input:focus {
+    outline: 2px solid rgba(53, 99, 255, .16);
+    border-color: var(--primary);
+}
+
+.auth-submit {
+    min-height: 42px;
+    margin-top: 4px;
+}
+
+.auth-note {
+    font-size: 12px;
+    line-height: 1.5;
+}
+
 button {
     border: 0;
     border-radius: 8px;
@@ -124,6 +227,25 @@ nav {
     background: white;
 }
 
+.login-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.login-actions .mini {
+    padding: 8px 9px;
+    font-size: 12px;
+}
+
+.login-actions .danger {
+    grid-column: 1 / -1;
+    color: var(--red);
+    background: #fff5f5;
+    border: 1px solid #f4c8c8;
+}
+
 .main {
     padding: 30px 38px 48px;
 }
@@ -153,9 +275,6 @@ nav {
 }
 
 .hero {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 330px;
-    gap: 24px;
     padding: 34px;
     margin-bottom: 24px;
     border: 1px solid #dde5f7;
@@ -191,28 +310,6 @@ nav {
 .hero-actions .secondary {
     color: var(--primary);
     background: white;
-}
-
-.flow-card {
-    display: grid;
-    align-content: center;
-    gap: 9px;
-    padding: 22px;
-    border-radius: 8px;
-    background: rgba(255, 255, 255, .78);
-    border: 1px solid rgba(255, 255, 255, .92);
-}
-
-.flow-card span {
-    color: var(--muted);
-    font-size: 13px;
-}
-
-.flow-card b {
-    padding: 10px 12px;
-    border-radius: 8px;
-    background: #eef3ff;
-    color: var(--primary-dark);
 }
 
 .stats-grid {
@@ -268,6 +365,15 @@ nav {
     gap: 16px;
 }
 
+.empty-card {
+    grid-column: 1 / -1;
+    padding: 24px;
+    color: var(--muted);
+    border: 1px dashed #cfd8eb;
+    border-radius: 8px;
+    background: #fbfcff;
+}
+
 .card {
     min-height: 188px;
     display: flex;
@@ -319,6 +425,23 @@ nav {
 .assistant-box .light {
     color: var(--primary);
     background: #eef3ff;
+}
+
+.group-detail,
+.open-group {
+    display: grid;
+    gap: 6px;
+    margin-top: 12px;
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.open-group {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    padding: 9px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
 }
 
 .price {
@@ -389,23 +512,85 @@ td button {
     background: #fee2e2;
 }
 
-.admin-grid,
-.ai-layout {
+.admin-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 320px;
     gap: 18px;
 }
 
-.assistant-box,
-.ai-side {
+.activity-form {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    padding: 20px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fbfcff;
+}
+
+.form-heading,
+.wide-field {
+    grid-column: 1 / -1;
+}
+
+.form-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.form-heading h4 {
+    margin: 0;
+    font-size: 17px;
+}
+
+.form-heading span {
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.activity-form label {
+    display: grid;
+    gap: 7px;
+    color: #3b465a;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.activity-form input,
+.activity-form select {
+    width: 100%;
+    min-height: 40px;
+    padding: 9px 10px;
+    border: 1px solid #cfd8eb;
+    border-radius: 6px;
+    color: var(--text);
+    background: white;
+    font: inherit;
+}
+
+.activity-form input:focus,
+.activity-form select:focus {
+    outline: 2px solid rgba(53, 99, 255, .16);
+    border-color: var(--primary);
+}
+
+.activity-form button {
+    align-self: end;
+    min-height: 40px;
+    padding: 0 18px;
+}
+
+.assistant-box {
     padding: 18px;
     border-radius: 8px;
     background: #f4f7ff;
     border: 1px solid #dfe7ff;
 }
 
-.assistant-box h4,
-.ai-side h4 {
+.assistant-box h4 {
     margin: 0 0 10px;
 }
 
@@ -455,8 +640,7 @@ td button {
     margin-top: 8px;
 }
 
-.evidence-row span,
-.ai-side span {
+.evidence-row span {
     padding: 6px 8px;
     border-radius: 8px;
     background: white;
@@ -506,15 +690,19 @@ td button {
     line-height: 1.65;
 }
 
-.ai-side {
-    display: grid;
-    align-content: start;
-    gap: 10px;
+
+.quick-questions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
 }
 
-.ai-side span {
-    color: var(--primary-dark);
-    font-weight: 800;
+.quick-questions .light {
+    padding: 8px 11px;
+    color: var(--primary);
+    background: #eef3ff;
+    font-size: 13px;
 }
 
 .chat-form {
@@ -570,9 +758,12 @@ td button {
     }
 
     .hero,
-    .admin-grid,
-    .ai-layout {
+    .admin-grid {
         grid-template-columns: 1fr;
+    }
+
+    .activity-form {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .stats-grid,
@@ -584,6 +775,10 @@ td button {
 @media (max-width: 720px) {
     .main {
         padding: 22px 16px 38px;
+    }
+
+    .activity-form {
+        grid-template-columns: 1fr;
     }
 
     .topbar {

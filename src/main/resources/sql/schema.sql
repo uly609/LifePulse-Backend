@@ -1,4 +1,9 @@
 DROP TABLE IF EXISTS outbox_event;
+DROP TABLE IF EXISTS user_notification;
+DROP TABLE IF EXISTS notify_task;
+DROP TABLE IF EXISTS group_member;
+DROP TABLE IF EXISTS group_team;
+DROP TABLE IF EXISTS group_activity;
 DROP TABLE IF EXISTS shop_review;
 DROP TABLE IF EXISTS deal_order;
 DROP TABLE IF EXISTS voucher;
@@ -39,6 +44,48 @@ CREATE TABLE voucher (
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL,
     INDEX idx_voucher_shop (shop_id)
+);
+
+CREATE TABLE group_activity (
+    id BIGINT PRIMARY KEY,
+    voucher_id BIGINT NOT NULL,
+    title VARCHAR(128) NOT NULL,
+    description VARCHAR(512) NOT NULL,
+    required_size INT NOT NULL,
+    group_price DECIMAL(10,2) NOT NULL,
+    total_stock INT NOT NULL,
+    joined_count INT NOT NULL DEFAULT 0,
+    allowed_role VARCHAR(32) NOT NULL DEFAULT 'USER',
+    status VARCHAR(32) NOT NULL,
+    begin_time TIMESTAMP NOT NULL,
+    end_time TIMESTAMP NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL
+);
+
+CREATE TABLE group_team (
+    id BIGINT PRIMARY KEY,
+    activity_id BIGINT NOT NULL,
+    leader_user_id BIGINT NOT NULL,
+    current_size INT NOT NULL DEFAULT 0,
+    required_size INT NOT NULL,
+    status VARCHAR(32) NOT NULL,
+    expire_time TIMESTAMP NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+    INDEX idx_group_activity_status (activity_id, status)
+);
+
+CREATE TABLE group_member (
+    id BIGINT PRIMARY KEY,
+    group_id BIGINT NOT NULL,
+    activity_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    order_id BIGINT NOT NULL,
+    status VARCHAR(32) NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    UNIQUE KEY uk_group_user (group_id, user_id),
+    UNIQUE KEY uk_activity_user (activity_id, user_id)
 );
 
 CREATE TABLE deal_order (
@@ -82,4 +129,29 @@ CREATE TABLE outbox_event (
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL,
     INDEX idx_outbox_status_retry (status, next_retry_time)
+);
+
+CREATE TABLE user_notification (
+    id BIGINT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    title VARCHAR(128) NOT NULL,
+    content VARCHAR(512) NOT NULL,
+    type VARCHAR(32) NOT NULL,
+    read_status BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP NOT NULL,
+    INDEX idx_notification_user_time (user_id, created_at)
+);
+
+CREATE TABLE notify_task (
+    id BIGINT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    title VARCHAR(128) NOT NULL,
+    content VARCHAR(512) NOT NULL,
+    type VARCHAR(32) NOT NULL,
+    status VARCHAR(32) NOT NULL,
+    retry_count INT NOT NULL DEFAULT 0,
+    next_retry_time TIMESTAMP NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP NOT NULL,
+    INDEX idx_notify_task_status_retry (status, next_retry_time)
 );

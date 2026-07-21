@@ -1,5 +1,29 @@
 <template>
-  <div class="shell">
+  <section v-if="!authToken" class="auth-page">
+    <form class="auth-panel" @submit.prevent="authMode === 'login' ? loginManual() : registerAccount()">
+      <div class="auth-brand">
+        <span class="brand-mark">LP</span>
+        <div>
+          <strong>LifePulse</strong>
+          <small>本地生活交易平台</small>
+        </div>
+      </div>
+      <h1>{{ authMode === 'login' ? '登录 LifePulse' : '创建账号' }}</h1>
+      <p>{{ authMode === 'login' ? '登录后查看商户、领取优惠券、管理订单。' : '注册完成后将自动登录为普通用户。' }}</p>
+      <div class="auth-switch" role="tablist">
+        <button type="button" :class="{active: authMode === 'login'}" @click="authMode = 'login'">登录</button>
+        <button type="button" :class="{active: authMode === 'register'}" @click="authMode = 'register'">注册</button>
+      </div>
+      <label>账号<input v-model.trim="loginUsername" autocomplete="username" placeholder="输入账号"></label>
+      <label>密码<input v-model="loginPassword" type="password" autocomplete="current-password" placeholder="至少 6 位"></label>
+      <label v-if="authMode === 'register'">确认密码<input v-model="confirmPassword" type="password" autocomplete="new-password" placeholder="再次输入密码"></label>
+      <button class="auth-submit" type="submit">{{ authMode === 'login' ? '登录进入平台' : '注册并进入平台' }}</button>
+      <small class="auth-note">管理员和商户使用已有账号登录；新注册账号默认为普通用户。</small>
+    </form>
+    <div class="toast" :class="{show: toastMessage}">{{ toastMessage }}</div>
+  </section>
+
+  <div v-else class="shell">
     <aside class="sidebar">
       <div class="brand">
         <span class="brand-mark">LP</span>
@@ -10,7 +34,7 @@
       </div>
 
       <nav>
-        <button v-for="item in navItems" :key="item.key" class="nav-item" :class="{active: view === item.key}" @click="switchView(item.key)">
+        <button v-for="item in visibleNavItems" :key="item.key" class="nav-item" :class="{active: view === item.key}" @click="switchView(item.key)">
           {{ item.label }}
         </button>
       </nav>
@@ -18,40 +42,33 @@
       <div class="profile">
         <span>当前用户</span>
         <strong>{{ user.username }} / {{ user.userId }}</strong>
-        <small>{{ user.role }} 演示账号</small>
+        <small>{{ user.role }}</small>
+        <button class="mini danger" @click="logout">退出登录</button>
       </div>
     </aside>
 
     <main class="main">
       <header class="topbar">
         <div>
-          <h1>本地生活拼团探店营销交易平台</h1>
-          <p>Vue 3 前端、Spring Boot 后端、Redis/RocketMQ/Outbox 交易链路、MCP + 大模型智能客服。</p>
+          <h1>LifePulse 本地生活</h1>
+          <p>发现附近好店，领取限时优惠。</p>
         </div>
         <button class="ghost" @click="refreshAll">刷新数据</button>
       </header>
 
       <section class="hero">
         <div>
-          <span class="eyebrow">Full Stack Demo</span>
-          <h2>交易、运营与 AI 助手一体化</h2>
-          <p>抢券链路走资格 Token、Redis Lua、RocketMQ 和 Outbox；AI 助手会调用业务工具后再请求大模型。</p>
+          <span class="eyebrow">本周精选</span>
+          <h2>好店、优惠和订单，都在这里</h2>
+          <p>查看附近商户，领取限时优惠券；下单后的支付和订单状态也能随时查看。</p>
           <div class="hero-actions">
             <button @click="switchView('vouchers')">去抢优惠券</button>
-            <button class="secondary" @click="switchView('ai')">问 AI 助手</button>
+            <button class="secondary" @click="switchView('shops')">浏览商户</button>
           </div>
-        </div>
-        <div class="flow-card">
-          <span>Vue 3 / Vite</span>
-          <b>JWT + RBAC</b>
-          <span>Redis Lua</span>
-          <b>RocketMQ + Outbox</b>
-          <span>MCP Tool</span>
-          <b>AI API + SSE</b>
         </div>
       </section>
 
-      <section class="stats-grid">
+      <section v-if="canViewOperations" class="stats-grid">
         <div v-for="item in statItems" :key="item.label" class="stat">
           <span>{{ item.label }}</span>
           <strong>{{ item.value }}</strong>
@@ -64,6 +81,7 @@
           <span>按热度排序</span>
         </div>
         <div class="card-grid">
+          <div v-if="shops.length === 0" class="empty-card">暂无推荐商户，先确认后端 `/api/shops` 是否返回数据。</div>
           <ShopCard v-for="shop in shops" :key="shop.id" :shop="shop" @review="publishReview" />
         </div>
       </section>
@@ -74,6 +92,7 @@
           <span>Caffeine 本地缓存承接热门详情</span>
         </div>
         <div class="card-grid">
+          <div v-if="shops.length === 0" class="empty-card">暂无商户数据。</div>
           <ShopCard v-for="shop in shops" :key="shop.id" :shop="shop" @review="publishReview" />
         </div>
       </section>
@@ -105,6 +124,33 @@
             </div>
           </article>
         </div>
+      </section>
+
+      <section v-show="view === 'groups'" class="panel">
+        <div class="section-title"><h3>拼团活动</h3><span>邀请好友一起拼，达到人数即可成团</span></div>
+        <div class="card-grid">
+          <article v-for="activity in groupActivities" :key="activity.id" class="card">
+            <div><h4>{{ activity.title }}</h4><div class="price">{{ money(activity.groupPrice) }}</div><div class="meta"><span>{{ activity.description }}</span><span>{{ activity.requiredSize }} 人成团 / 剩余 {{ activity.totalStock - activity.joinedCount }} 个名额</span><span>活动截止 {{ formatTime(activity.endTime) }}</span></div></div>
+            <div class="card-actions"><button :disabled="groupDetails[activity.id] && !groupDetails[activity.id].eligibility.eligible" @click="createGroup(activity.id)">发起拼团</button></div>
+            <div class="card-actions"><button class="light" @click="loadActivityGroups(activity.id)">查看可加入的团</button></div>
+            <div v-if="groupDetails[activity.id]" class="group-detail">
+              <span v-if="groupDetails[activity.id].shop">商户：{{ groupDetails[activity.id].shop.name }}</span>
+              <span>关联券：{{ groupDetails[activity.id].voucher.title }}</span>
+              <span>{{ groupDetails[activity.id].eligibility.reason }}</span>
+            </div>
+            <div v-for="group in groupDetails[activity.id]?.openGroups || []" :key="group.id" class="open-group"><span>{{ group.currentSize }}/{{ group.requiredSize }} 人，{{ formatTime(group.expireTime) }} 截止</span><button class="mini" @click="joinGroup(group.id)">加入</button></div>
+          </article>
+        </div>
+      </section>
+
+      <section v-show="view === 'my-groups'" class="panel">
+        <div class="section-title"><h3>我的拼团</h3><span>支付后等待好友参团，人数满足即成团</span></div>
+        <div class="card-grid"><article v-for="item in myGroups" :key="item.member.id" class="card"><div><h4>{{ item.activity.title }}</h4><div class="meta"><span>{{ item.group.currentSize }} / {{ item.group.requiredSize }} 人</span><span>状态：{{ item.group.status }}</span><span>截止 {{ formatTime(item.group.expireTime) }}</span></div></div><div class="card-actions"><button :disabled="item.member.status !== 'PENDING_PAY'" @click="payGroup(item.member.orderId)">支付拼团订单</button></div></article><div v-if="myGroups.length===0" class="empty-card">还没有参加拼团，去拼团活动页发起一个吧。</div></div>
+      </section>
+
+      <section v-show="view === 'notifications'" class="panel">
+        <div class="section-title"><h3>消息通知</h3><span>拼团成团、失败退款和订单状态提醒</span></div>
+        <div class="card-grid"><article v-for="item in notifications" :key="item.id" class="card"><div><h4>{{ item.title }}</h4><div class="meta"><span>{{ item.content }}</span><span>{{ formatTime(item.createdAt) }}</span></div></div><div class="card-actions"><button class="light" :disabled="item.readStatus" @click="readNotification(item.id)">{{ item.readStatus ? '已读' : '标记已读' }}</button></div></article><div v-if="notifications.length===0" class="empty-card">暂无消息通知。</div></div>
       </section>
 
       <section v-show="view === 'orders'" class="panel">
@@ -147,24 +193,25 @@
 
       <section v-show="view === 'ai'" class="panel">
         <div class="section-title">
-          <h3>AI 智能客服</h3>
-          <span>大模型 API + MCP 工具 + SSE 流式输出</span>
+          <h3>在线客服</h3>
+          <span>帮你查商户、优惠券和订单</span>
         </div>
         <div class="ai-layout">
           <div ref="chatBoxRef" class="chat-box">
             <div v-for="message in messages" :key="message.id" class="chat-message" :class="message.role">
-              <strong>{{ message.role === 'user' ? '我' : 'LifePulse Assistant' }}</strong>
+              <strong>{{ message.role === 'user' ? '我' : 'LifePulse 客服' }}</strong>
               <p>{{ message.content }}</p>
             </div>
           </div>
-          <div class="ai-side">
-            <h4>已封装工具</h4>
-            <span v-for="tool in mcpTools" :key="tool">{{ tool }}</span>
-          </div>
+        </div>
+        <div class="quick-questions">
+          <button class="light" :disabled="isAnswering" @click="askSuggestion('附近有什么咖啡店？')">附近有什么咖啡店？</button>
+          <button class="light" :disabled="isAnswering" @click="askSuggestion('现在有哪些优惠券？')">现在有哪些优惠券？</button>
+          <button class="light" :disabled="isAnswering" @click="askSuggestion('帮我查询我的订单')">查询我的订单</button>
         </div>
         <form class="chat-form" @submit.prevent="askAi">
-          <input v-model.trim="question" placeholder="问一句，比如：帮我分析现在优惠券秒杀链路有没有风险">
-          <button type="submit">发送</button>
+          <input v-model.trim="question" :disabled="isAnswering" placeholder="输入你的问题，例如：附近有什么咖啡店？" @keydown.enter.prevent="askAi">
+          <button type="submit" :disabled="isAnswering || !question">{{ isAnswering ? '正在回复' : '发送' }}</button>
         </form>
       </section>
 
@@ -174,7 +221,18 @@
           <span>订单、Outbox 与 Agent 诊断</span>
         </div>
         <div class="admin-grid">
-          <div class="table-wrap">
+          <form v-if="canViewOperations" class="activity-form" @submit.prevent="configureActivity">
+            <div class="form-heading"><h4>新建拼团活动</h4><span>发布后立即进入活动列表</span></div>
+            <label class="wide-field">活动名称<input v-model.trim="activityForm.title" placeholder="例如：周末双人下午茶拼团"></label>
+            <label class="wide-field">活动说明<input v-model.trim="activityForm.description" placeholder="填写用户可见的活动规则说明"></label>
+            <label>关联优惠券 ID<input v-model.number="activityForm.voucherId" type="number" min="1"></label>
+            <label>成团人数<input v-model.number="activityForm.requiredSize" type="number" min="2"></label>
+            <label>拼团价格（元）<input v-model.number="activityForm.groupPrice" type="number" min="0.01" step="0.01"></label>
+            <label>活动名额<input v-model.number="activityForm.totalStock" type="number" min="1"></label>
+            <label>参与人群<select v-model="activityForm.allowedRole"><option value="USER">普通用户</option><option value="ALL">所有角色</option></select></label>
+            <button type="submit">发布活动</button>
+          </form>
+          <div v-if="user.role === 'ADMIN'" class="table-wrap">
             <table>
               <thead>
               <tr>
@@ -228,11 +286,16 @@
 <script setup>
 import {computed, nextTick, onMounted, ref} from "vue";
 
+// 开发时留空，让 Vite 把 /api 代理到 8110；避免浏览器跨端口直连被拦截。
 const API_BASE = import.meta.env.VITE_API_BASE || "";
+const SESSION_STORAGE_KEY = "lifepulse.session";
 const navItems = [
   {key: "home", label: "首页总览"},
   {key: "shops", label: "商户探店"},
   {key: "vouchers", label: "优惠券秒杀"},
+  {key: "groups", label: "拼团活动"},
+  {key: "my-groups", label: "我的拼团"},
+  {key: "notifications", label: "消息通知"},
   {key: "orders", label: "我的订单"},
   {key: "ai", label: "AI 助手"},
   {key: "admin", label: "运营看板"}
@@ -240,10 +303,15 @@ const navItems = [
 
 const view = ref("home");
 const authToken = ref("");
-const user = ref({userId: 10003, username: "admin", role: "ADMIN"});
+const user = ref({});
 const stats = ref({});
 const shops = ref([]);
 const vouchers = ref([]);
+const groupActivities = ref([]);
+const myGroups = ref([]);
+const notifications = ref([]);
+const groupDetails = ref({});
+const activityForm = ref({title:"",description:"",voucherId:1,requiredSize:2,groupPrice:29.9,totalStock:20,allowedRole:"USER"});
 const orders = ref([]);
 const outbox = ref([]);
 const diagnosis = ref(null);
@@ -251,14 +319,20 @@ const qualificationTokens = ref(new Map());
 const toastMessage = ref("");
 const question = ref("");
 const chatBoxRef = ref(null);
+const isAnswering = ref(false);
+const authMode = ref("login");
+const loginUsername = ref("");
+const loginPassword = ref("");
+const confirmPassword = ref("");
+const canViewOperations = computed(() => ["ADMIN", "MERCHANT"].includes(user.value.role));
+const visibleNavItems = computed(() => navItems.filter(item => item.key !== "admin" || canViewOperations.value));
 const messages = ref([
   {
     id: 1,
     role: "assistant",
-    content: "你可以问我：有哪些优惠券、我的订单状态、为什么 Outbox 积压、现在运营风险怎么样。"
+    content: "你好，我可以帮你查找商户、查看优惠券和查询订单。"
   }
 ]);
-const mcpTools = ["list_shops", "list_vouchers", "my_orders", "admin_stats", "ops_diagnosis", "ai_chat"];
 
 const statItems = computed(() => [
   ["商户", stats.value.shops ?? "-"],
@@ -275,21 +349,120 @@ async function api(path, options = {}) {
     headers.Authorization = `Bearer ${authToken.value}`;
   }
   const response = await fetch(`${API_BASE}${path}`, {...options, headers});
-  const json = await response.json();
+  const text = await response.text();
+  let json;
+  try {
+    json = text ? JSON.parse(text) : {};
+  } catch {
+    throw new Error(text || `请求失败：HTTP ${response.status}`);
+  }
+  if (!response.ok) {
+    throw new Error(json.message || `请求失败：HTTP ${response.status}`);
+  }
   if (json.code !== 200) {
     throw new Error(json.message || "请求失败");
   }
   return json.data;
 }
 
-async function loginDemoUser() {
+async function loginDemoUser(username = "student", password = "123456") {
   const data = await api("/api/users/login", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({username: "admin", password: "123456"})
+    body: JSON.stringify({username, password})
   });
+  saveSession(data);
+  loginUsername.value = data.username;
+}
+
+async function loginManual() {
+  if (!loginUsername.value || !loginPassword.value) {
+    showToast("请输入账号和密码");
+    return;
+  }
+  try {
+    await loginDemoUser(loginUsername.value, loginPassword.value);
+    showToast("登录成功");
+    await refreshAll();
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
+async function registerAccount() {
+  if (!loginUsername.value || !loginPassword.value) {
+    showToast("请输入账号和密码");
+    return;
+  }
+  if (loginPassword.value !== confirmPassword.value) {
+    showToast("两次密码输入不一致");
+    return;
+  }
+  try {
+    const data = await api("/api/users/register", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({username: loginUsername.value, password: loginPassword.value})
+    });
+    saveSession(data);
+    confirmPassword.value = "";
+    showToast("注册成功，已登录");
+    await refreshAll();
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
+function logout() {
+  clearSession();
+  loginPassword.value = "";
+  confirmPassword.value = "";
+  authMode.value = "login";
+  view.value = "home";
+  showToast("已退出登录");
+}
+
+function saveSession(data) {
   authToken.value = data.token;
-  user.value = data;
+  user.value = {
+    userId: data.userId,
+    username: data.username,
+    role: data.role
+  };
+  localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
+    token: data.token,
+    user: user.value
+  }));
+}
+
+function clearSession() {
+  authToken.value = "";
+  user.value = {};
+  orders.value = [];
+  outbox.value = [];
+  diagnosis.value = null;
+  qualificationTokens.value.clear();
+  localStorage.removeItem(SESSION_STORAGE_KEY);
+}
+
+async function restoreSession() {
+  const saved = localStorage.getItem(SESSION_STORAGE_KEY);
+  if (!saved) {
+    return;
+  }
+  try {
+    const session = JSON.parse(saved);
+    if (!session?.token || !session?.user?.userId) {
+      throw new Error("登录信息无效");
+    }
+    authToken.value = session.token;
+    user.value = session.user;
+    await loadOrders();
+    await refreshAll();
+  } catch {
+    clearSession();
+    showToast("登录已失效，请重新登录");
+  }
 }
 
 function showToast(message) {
@@ -301,10 +474,17 @@ function showToast(message) {
 }
 
 function switchView(nextView) {
+  if (!authToken.value && ["orders", "ai"].includes(nextView)) {
+    showToast("请先登录后再使用该功能");
+    return;
+  }
   view.value = nextView;
   if (nextView === "orders") {
     loadOrders();
   }
+  if (nextView === "groups") loadGroups();
+  if (nextView === "my-groups") loadMyGroups();
+  if (nextView === "notifications") loadNotifications();
   if (nextView === "admin") {
     loadAdmin();
   }
@@ -320,6 +500,10 @@ function money(value) {
 }
 
 async function loadStats() {
+  if (!canViewOperations.value) {
+    stats.value = {};
+    return;
+  }
   stats.value = await api("/api/admin/stats");
 }
 
@@ -330,6 +514,15 @@ async function loadShops() {
 async function loadVouchers() {
   vouchers.value = await api("/api/vouchers");
 }
+async function loadGroups() { groupActivities.value = await api("/api/groups/activities"); }
+async function loadActivityGroups(activityId) { try { groupDetails.value[activityId] = await api(`/api/groups/activities/${activityId}`); } catch(e){showToast(e.message);} }
+async function loadMyGroups() { myGroups.value = await api("/api/groups/me"); }
+async function loadNotifications() { notifications.value = await api("/api/notifications"); }
+async function readNotification(id) { try { await api(`/api/notifications/${id}/read`,{method:"POST"}); await loadNotifications(); } catch(e){showToast(e.message);} }
+async function createGroup(activityId) { try { await api(`/api/groups/activities/${activityId}`, {method:"POST"}); showToast("拼团已发起，请完成支付"); await Promise.all([loadGroups(), loadMyGroups(), loadOrders()]); view.value="my-groups"; } catch(e){showToast(e.message);} }
+async function joinGroup(groupId) { try { await api(`/api/groups/${groupId}/join`, {method:"POST"}); showToast("已加入拼团，请完成支付"); await Promise.all([loadGroups(), loadMyGroups(), loadOrders()]); view.value="my-groups"; } catch(e){showToast(e.message);} }
+async function payGroup(orderId) { try { await api(`/api/groups/orders/${orderId}/pay`, {method:"POST"}); showToast("支付成功，正在等待成团"); await Promise.all([loadMyGroups(),loadOrders(),loadGroups()]); } catch(e){showToast(e.message);} }
+async function configureActivity() { try { const endTime = new Date(Date.now()+7*24*3600*1000).toISOString().slice(0,19); await api("/api/groups/admin/activities",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...activityForm.value,endTime})}); showToast("拼团活动已发布"); await loadGroups(); } catch(e){showToast(e.message);} }
 
 async function loadOrders() {
   orders.value = await api("/api/orders/me");
@@ -344,10 +537,22 @@ async function loadDiagnosis() {
 }
 
 async function loadAdmin() {
-  await Promise.all([loadOutbox(), loadDiagnosis()]);
+  if (!canViewOperations.value) {
+    return;
+  }
+  const tasks = [loadDiagnosis()];
+  if (user.value.role === "ADMIN") {
+    tasks.push(loadOutbox());
+  } else {
+    outbox.value = [];
+  }
+  await Promise.all(tasks);
 }
 
 async function publishReview(shopId) {
+  if (!requireLogin()) {
+    return;
+  }
   try {
     await api(`/api/shops/${shopId}/reviews`, {
       method: "POST",
@@ -362,6 +567,9 @@ async function publishReview(shopId) {
 }
 
 async function applyQualification(voucherId) {
+  if (!requireLogin()) {
+    return;
+  }
   try {
     const data = await api(`/api/vouchers/${voucherId}/qualification`, {method: "POST"});
     qualificationTokens.value.set(voucherId, data.qualificationToken);
@@ -372,6 +580,9 @@ async function applyQualification(voucherId) {
 }
 
 async function seckill(voucherId) {
+  if (!requireLogin()) {
+    return;
+  }
   const token = qualificationTokens.value.get(voucherId);
   if (!token) {
     showToast("先点“申请资格”，再点“立即抢券”");
@@ -429,43 +640,63 @@ function appendMessage(role, content) {
   return item;
 }
 
-function askAi() {
-  if (!question.value) {
+async function askAi() {
+  if (!requireLogin()) {
+    return;
+  }
+  if (!question.value || isAnswering.value) {
     return;
   }
   const currentQuestion = question.value;
   question.value = "";
   appendMessage("user", currentQuestion);
-  const answer = appendMessage("assistant", "");
-  const url = `${API_BASE}/api/ai/chat/stream?question=${encodeURIComponent(currentQuestion)}&token=${encodeURIComponent(authToken.value)}`;
-  const source = new EventSource(url);
-  source.addEventListener("meta", event => {
-    answer.content += `[${event.data}]\n`;
-  });
-  source.addEventListener("message", event => {
-    answer.content += event.data;
+  const answer = appendMessage("assistant", "正在查询，请稍候...");
+  isAnswering.value = true;
+  try {
+    const data = await api("/api/ai/chat", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({question: currentQuestion})
+    });
+    answer.content = data.answer || "客服暂时没有找到可回复的内容。";
+  } catch (error) {
+    answer.content = error.message || "客服暂时无法回复，请稍后再试。";
+  } finally {
+    isAnswering.value = false;
     nextTick(() => {
       if (chatBoxRef.value) {
         chatBoxRef.value.scrollTop = chatBoxRef.value.scrollHeight;
       }
     });
-  });
-  source.addEventListener("done", () => {
-    source.close();
-  });
-  source.onerror = () => {
-    source.close();
-    if (!answer.content) {
-      answer.content = "AI 助手连接失败，请检查后端或 API Key。";
-    }
-  };
+  }
+}
+
+function askSuggestion(text) {
+  question.value = text;
+  askAi();
+}
+
+function requireLogin() {
+  if (authToken.value) {
+    return true;
+  }
+  showToast("请先登录后再操作");
+  return false;
 }
 
 async function refreshAll() {
-  try {
-    await Promise.all([loadStats(), loadShops(), loadVouchers(), loadOrders(), loadAdmin()]);
-  } catch (error) {
-    showToast(error.message);
+  const tasks = [loadShops(), loadVouchers()];
+  if (authToken.value) {
+    tasks.push(loadOrders());
+    if (canViewOperations.value) {
+      tasks.push(loadStats());
+      tasks.push(loadAdmin());
+    }
+  }
+  const results = await Promise.allSettled(tasks);
+  const rejected = results.find(result => result.status === "rejected");
+  if (rejected) {
+    showToast(rejected.reason?.message || "部分数据加载失败");
   }
 }
 
@@ -498,12 +729,5 @@ const ShopCard = {
   `
 };
 
-onMounted(async () => {
-  try {
-    await loginDemoUser();
-    await refreshAll();
-  } catch (error) {
-    showToast(error.message);
-  }
-});
+onMounted(restoreSession);
 </script>

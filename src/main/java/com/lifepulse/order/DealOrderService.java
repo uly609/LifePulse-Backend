@@ -3,6 +3,7 @@ package com.lifepulse.order;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.lifepulse.common.BusinessException;
+import com.lifepulse.domain.order.OrderStateMachine;
 import com.lifepulse.entity.DealOrder;
 import com.lifepulse.mapper.DealOrderMapper;
 import com.lifepulse.voucher.VoucherService;
@@ -45,6 +46,9 @@ public class DealOrderService {
     @Transactional(rollbackFor = Exception.class)
     public void cancel(Long orderId, Long userId) {
         DealOrder order = requireOrder(orderId, userId);
+        if (!OrderStateMachine.canCancel(order.getStatus())) {
+            throw new BusinessException("订单状态已变化，不能取消");
+        }
         int updated = orderMapper.update(null, new LambdaUpdateWrapper<DealOrder>()
                 .eq(DealOrder::getId, orderId)
                 .eq(DealOrder::getUserId, userId)
@@ -62,6 +66,9 @@ public class DealOrderService {
     @Transactional(rollbackFor = Exception.class)
     public void refund(Long orderId, Long userId) {
         DealOrder order = requireOrder(orderId, userId);
+        if (!OrderStateMachine.canRefund(order.getStatus())) {
+            throw new BusinessException("订单状态已变化，不能退款");
+        }
         int updated = orderMapper.update(null, new LambdaUpdateWrapper<DealOrder>()
                 .eq(DealOrder::getId, orderId)
                 .eq(DealOrder::getUserId, userId)

@@ -20,7 +20,7 @@ public class ReviewController {
 
     @PostMapping
     public Result<Void> publish(@PathVariable Long shopId, @Valid @RequestBody ReviewRequest request) {
-        reviewService.publish(shopId, CurrentUser.resolve(request.userId()), request);
+        reviewService.publish(shopId, CurrentUser.resolve(null), request);
         return Result.success(null);
     }
 }

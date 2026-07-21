@@ -5,7 +5,6 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 
 public record ReviewRequest(
-        Long userId,
         @Min(value = 1, message = "评分最低为1")
         @Max(value = 5, message = "评分最高为5")
         Integer score,
