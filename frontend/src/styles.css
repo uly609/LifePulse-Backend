@@ -507,7 +507,8 @@ td button {
     background: #edf1f7;
 }
 
-.status.FAILED {
+.status.FAILED,
+.status.DEAD_LETTER {
     color: #ef4444;
     background: #fee2e2;
 }
@@ -583,6 +584,18 @@ td button {
     padding: 0 18px;
 }
 
+.activity-form .switch-field {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 40px;
+}
+
+.activity-form .switch-field input {
+    width: 18px;
+    min-height: 18px;
+}
+
 .assistant-box {
     padding: 18px;
     border-radius: 8px;
@@ -651,6 +664,63 @@ td button {
 .block-button {
     width: 100%;
     margin-top: 14px;
+}
+
+.metrics-row {
+    margin-top: 0;
+}
+
+.logs-panel {
+    grid-column: 1 / -1;
+}
+
+.log-search {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 96px;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.log-search input {
+    min-height: 40px;
+    padding: 9px 10px;
+    border: 1px solid #cfd8eb;
+    border-radius: 6px;
+    font: inherit;
+}
+
+.log-search input:focus {
+    outline: 2px solid rgba(53, 99, 255, .16);
+    border-color: var(--primary);
+}
+
+.log-item {
+    padding: 12px;
+    border: 1px solid #dfe7ff;
+    border-radius: 8px;
+    background: white;
+}
+
+.log-item + .log-item {
+    margin-top: 8px;
+}
+
+.log-item strong,
+.log-item span {
+    display: block;
+    font-size: 12px;
+}
+
+.log-item span {
+    margin-top: 3px;
+    color: var(--muted);
+}
+
+.log-item p {
+    margin: 8px 0 0;
+    color: #3b465a;
+    line-height: 1.5;
+    word-break: break-word;
 }
 
 .chat-box {

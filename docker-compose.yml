@@ -84,6 +84,8 @@ services:
       LIFEPULSE_AI_API_KEY: ${LIFEPULSE_AI_API_KEY:-}
       LIFEPULSE_AI_BASE_URL: ${LIFEPULSE_AI_BASE_URL:-https://api.deepseek.com/chat/completions}
       LIFEPULSE_AI_MODEL: ${LIFEPULSE_AI_MODEL:-deepseek-chat}
+      LIFEPULSE_ELASTICSEARCH_URL: ${LIFEPULSE_ELASTICSEARCH_URL:-http://elasticsearch:9200}
+      LIFEPULSE_PROMETHEUS_URL: ${LIFEPULSE_PROMETHEUS_URL:-http://prometheus:9090}
     volumes:
       - lifepulse_app_logs:/app/logs
 

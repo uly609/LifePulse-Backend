@@ -10,6 +10,8 @@ import com.lifepulse.entity.GroupMember;
 import com.lifepulse.entity.GroupTeam;
 import com.lifepulse.entity.Shop;
 import com.lifepulse.entity.Voucher;
+import com.lifepulse.config.dcc.DccValue;
+import com.lifepulse.infrastructure.limit.TrafficLimiterService;
 import com.lifepulse.mapper.DealOrderMapper;
 import com.lifepulse.mapper.GroupActivityMapper;
 import com.lifepulse.mapper.GroupMemberMapper;
@@ -27,6 +29,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -47,14 +50,24 @@ public class GroupService {
     private final NotifyTaskService notifications;
     private final OutboxEventService outbox;
     private final GroupJoinRuleChain joinRuleChain;
+    private final GroupParticipationBitmapService participationBitmap;
+    private final GroupInventoryService groupInventory;
+    private final TrafficLimiterService trafficLimiter;
     private final Executor groupDetailExecutor;
+    private final TransactionTemplate transactionTemplate;
+    @DccValue("group-rate-limit-per-second")
+    private volatile int groupRateLimitPerSecond = 50;
 
     public GroupService(GroupActivityMapper activityMapper, GroupTeamMapper teamMapper,
                         GroupMemberMapper memberMapper, DealOrderMapper orderMapper,
                         VoucherMapper voucherMapper, ShopMapper shopMapper, IdGenerator ids,
                         NotifyTaskService notifications, OutboxEventService outbox,
                         GroupJoinRuleChain joinRuleChain,
-                        @Qualifier("groupDetailExecutor") Executor groupDetailExecutor) {
+                        GroupParticipationBitmapService participationBitmap,
+                        GroupInventoryService groupInventory,
+                        TrafficLimiterService trafficLimiter,
+                        @Qualifier("groupDetailExecutor") Executor groupDetailExecutor,
+                        TransactionTemplate transactionTemplate) {
         this.activityMapper = activityMapper;
         this.teamMapper = teamMapper;
         this.memberMapper = memberMapper;
@@ -65,7 +78,11 @@ public class GroupService {
         this.notifications = notifications;
         this.outbox = outbox;
         this.joinRuleChain = joinRuleChain;
+        this.participationBitmap = participationBitmap;
+        this.groupInventory = groupInventory;
+        this.trafficLimiter = trafficLimiter;
         this.groupDetailExecutor = groupDetailExecutor;
+        this.transactionTemplate = transactionTemplate;
     }
 
     public List<GroupActivity> activities() {
@@ -118,7 +135,9 @@ public class GroupService {
 
     @Transactional(rollbackFor = Exception.class)
     public GroupTeam create(Long activityId, Long userId, String role) {
+        guardGroupTraffic(activityId);
         GroupActivity activity = checkJoin(activityId, userId, role);
+        groupInventory.reserveForCreate(activity, userId);
         reserveActivitySlot(activity.getId());
         LocalDateTime now = LocalDateTime.now();
         GroupTeam group = new GroupTeam();
@@ -127,6 +146,8 @@ public class GroupService {
         group.setExpireTime(now.plusMinutes(30)); group.setCreatedAt(now); group.setUpdatedAt(now);
         teamMapper.insert(group);
         addMember(activity, group, userId, now);
+        groupInventory.initializeCreatedTeamAfterCommit(activity, group);
+        participationBitmap.markJoinedAfterCommit(activityId, userId);
         log.info("group_created groupId={} activityId={} userId={}", group.getId(), activityId, userId);
         return group;
     }
@@ -137,13 +158,16 @@ public class GroupService {
         if (group == null || !"OPEN".equals(group.getStatus()) || group.getExpireTime().isBefore(LocalDateTime.now())) {
             throw new BusinessException("该拼团已结束");
         }
+        guardGroupTraffic(group.getActivityId());
         GroupActivity activity = checkJoin(group.getActivityId(), userId, role);
+        groupInventory.reserveForJoin(activity, group, userId);
         reserveActivitySlot(activity.getId());
         int reserved = teamMapper.update(null, new LambdaUpdateWrapper<GroupTeam>().eq(GroupTeam::getId, groupId)
                 .eq(GroupTeam::getStatus, "OPEN").apply("current_size < required_size")
                 .setSql("current_size = current_size + 1").set(GroupTeam::getUpdatedAt, LocalDateTime.now()));
         if (reserved == 0) throw new BusinessException("该拼团人数已满");
         addMember(activity, group, userId, LocalDateTime.now());
+        participationBitmap.markJoinedAfterCommit(group.getActivityId(), userId);
         log.info("group_joined groupId={} activityId={} userId={}", groupId, activity.getId(), userId);
         return teamMapper.selectById(groupId);
     }
@@ -190,7 +214,7 @@ public class GroupService {
     @Scheduled(fixedDelay = 30_000L)
     public void closeExpiredGroups() {
         List<GroupTeam> expired = teamMapper.selectList(new LambdaQueryWrapper<GroupTeam>().eq(GroupTeam::getStatus, "OPEN").lt(GroupTeam::getExpireTime, LocalDateTime.now()));
-        expired.forEach(group -> failGroup(group.getId()));
+        expired.forEach(group -> transactionTemplate.executeWithoutResult(status -> failGroup(group.getId())));
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -204,8 +228,11 @@ public class GroupService {
             orderMapper.update(null, new LambdaUpdateWrapper<DealOrder>().eq(DealOrder::getId, member.getOrderId()).eq(DealOrder::getStatus, OrderStatus.PAID)
                     .set(DealOrder::getStatus, OrderStatus.REFUNDED).set(DealOrder::getRefundedAt, LocalDateTime.now()).set(DealOrder::getUpdatedAt, LocalDateTime.now()));
             activityMapper.update(null, new LambdaUpdateWrapper<GroupActivity>().eq(GroupActivity::getId, member.getActivityId()).setSql("joined_count = joined_count - 1").set(GroupActivity::getUpdatedAt, LocalDateTime.now()));
+            groupInventory.releaseParticipationAfterCommit(member.getActivityId(), groupId, member.getUserId());
+            participationBitmap.clearJoinedAfterCommit(member.getActivityId(), member.getUserId());
             notifications.notify(member.getUserId(), "拼团未成团", "本次拼团超时未成团，已支付金额已自动退款。", "GROUP_FAILED");
         }
+        groupInventory.deleteTeamInventoryAfterCommit(group.getActivityId(), groupId);
         outbox.saveAndSend("GROUP_FAILED", groupId, "lifepulse-group-notify", "group=" + groupId, () -> {});
         log.info("group_failed_and_refunded groupId={}", groupId);
     }
@@ -215,6 +242,7 @@ public class GroupService {
                 .set(GroupTeam::getStatus, "SUCCESS").set(GroupTeam::getUpdatedAt, LocalDateTime.now()));
         memberMapper.update(null, new LambdaUpdateWrapper<GroupMember>().eq(GroupMember::getGroupId, group.getId()).set(GroupMember::getStatus, "SUCCESS"));
         for (GroupMember member : members(group.getId())) notifications.notify(member.getUserId(), "拼团成功", "你参加的拼团已成团，请按活动说明到店使用。", "GROUP_SUCCESS");
+        groupInventory.deleteTeamInventoryAfterCommit(group.getActivityId(), group.getId());
         outbox.saveAndSend("GROUP_SUCCESS", group.getId(), "lifepulse-group-notify", "group=" + group.getId(), () -> {});
         log.info("group_completed groupId={} activityId={}", group.getId(), group.getActivityId());
     }
@@ -245,5 +273,11 @@ public class GroupService {
                 .eq(GroupActivity::getStatus, "ONGOING").apply("joined_count < total_stock")
                 .setSql("joined_count = joined_count + 1").set(GroupActivity::getUpdatedAt, LocalDateTime.now()));
         if (reserved == 0) throw new BusinessException("活动名额已满或已结束");
+    }
+
+    private void guardGroupTraffic(Long activityId) {
+        if (!trafficLimiter.tryAcquire("group-activity:" + activityId, groupRateLimitPerSecond)) {
+            throw new BusinessException("当前拼团人数较多，请稍后再试");
+        }
     }
 }

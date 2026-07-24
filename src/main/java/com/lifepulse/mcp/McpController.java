@@ -76,6 +76,8 @@ public class McpController {
                 customerTools.get(0), customerTools.get(1), customerTools.get(2),
                 new McpTool("admin_stats", "查询运营统计数据", objectSchema()),
                 new McpTool("ops_diagnosis", "诊断订单、库存和Outbox链路风险", objectSchema()),
+                new McpTool("ops_logs", "按关键词检索最近日志", logsSchema()),
+                new McpTool("ops_metrics", "查询系统核心指标快照", objectSchema()),
                 customerTools.get(3)
         );
     }
@@ -96,6 +98,14 @@ public class McpController {
             case "ops_diagnosis" -> {
                 requireOperator();
                 yield opsAgentService.diagnose();
+            }
+            case "ops_logs" -> {
+                requireOperator();
+                yield opsAgentService.recentLogs(readKeyword(params), readLimit(params));
+            }
+            case "ops_metrics" -> {
+                requireOperator();
+                yield opsAgentService.metricsSnapshot();
             }
             case "ai_chat" -> aiAssistantService.chat(readQuestion(params));
             default -> throw new BusinessException("未知工具：" + name);
@@ -125,6 +135,16 @@ public class McpController {
         );
     }
 
+    private Map<String, Object> logsSchema() {
+        return Map.of(
+                "type", "object",
+                "properties", Map.of(
+                        "keyword", Map.of("type", "string", "description", "日志关键词"),
+                        "limit", Map.of("type", "number", "description", "返回条数")
+                )
+        );
+    }
+
     private boolean isOperator() {
         return "ADMIN".equals(UserContext.getRole()) || "MERCHANT".equals(UserContext.getRole());
     }
@@ -133,5 +153,33 @@ public class McpController {
         if (!isOperator()) {
             throw new BusinessException("当前账号无运营权限");
         }
+    }
+
+    private String readKeyword(Map<String, Object> params) {
+        Object arguments = params.get("arguments");
+        if (arguments instanceof Map<?, ?> map) {
+            Object keyword = map.get("keyword");
+            if (keyword != null) {
+                return String.valueOf(keyword);
+            }
+        }
+        return "";
+    }
+
+    private int readLimit(Map<String, Object> params) {
+        Object arguments = params.get("arguments");
+        if (arguments instanceof Map<?, ?> map) {
+            Object limit = map.get("limit");
+            if (limit instanceof Number number) {
+                return Math.max(1, Math.min(50, number.intValue()));
+            }
+            if (limit != null) {
+                try {
+                    return Math.max(1, Math.min(50, Integer.parseInt(String.valueOf(limit))));
+                } catch (Exception ignored) {
+                }
+            }
+        }
+        return 10;
     }
 }

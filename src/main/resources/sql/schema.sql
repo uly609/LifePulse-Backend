@@ -1,4 +1,5 @@
 DROP TABLE IF EXISTS outbox_event;
+DROP TABLE IF EXISTS cache_change_event;
 DROP TABLE IF EXISTS user_notification;
 DROP TABLE IF EXISTS notify_task;
 DROP TABLE IF EXISTS group_member;
@@ -154,4 +155,15 @@ CREATE TABLE notify_task (
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL,
     INDEX idx_notify_task_status_retry (status, next_retry_time)
+);
+
+CREATE TABLE cache_change_event (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    aggregate_type VARCHAR(32) NOT NULL,
+    aggregate_id BIGINT NOT NULL,
+    operation_type VARCHAR(16) NOT NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'PENDING',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    consumed_at TIMESTAMP NULL,
+    INDEX idx_cache_change_status (status, id)
 );

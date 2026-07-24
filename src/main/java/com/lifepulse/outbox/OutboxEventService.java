@@ -9,6 +9,7 @@ import com.lifepulse.mapper.OutboxEventMapper;
 import org.apache.rocketmq.client.producer.SendCallback;
 import org.apache.rocketmq.client.producer.SendResult;
 import org.apache.rocketmq.spring.core.RocketMQTemplate;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -25,6 +26,7 @@ public class OutboxEventService {
     private static final String PENDING = "PENDING";
     private static final String SENT = "SENT";
     private static final String FAILED = "FAILED";
+    private static final String DEAD_LETTER = "DEAD_LETTER";
 
     private final OutboxEventMapper outboxEventMapper;
     private final RocketMQTemplate rocketMQTemplate;
@@ -32,11 +34,11 @@ public class OutboxEventService {
     private final IdGenerator idGenerator;
 
     public OutboxEventService(OutboxEventMapper outboxEventMapper,
-                              RocketMQTemplate rocketMQTemplate,
+                              ObjectProvider<RocketMQTemplate> rocketMQTemplateProvider,
                               LifePulseProperties properties,
                               IdGenerator idGenerator) {
         this.outboxEventMapper = outboxEventMapper;
-        this.rocketMQTemplate = rocketMQTemplate;
+        this.rocketMQTemplate = rocketMQTemplateProvider.getIfAvailable();
         this.properties = properties;
         this.idGenerator = idGenerator;
     }
@@ -62,6 +64,10 @@ public class OutboxEventService {
     }
 
     private void sendAsync(OutboxEvent event) {
+        if (rocketMQTemplate == null) {
+            markFailed(event.getId(), "RocketMQTemplate未初始化");
+            return;
+        }
         rocketMQTemplate.asyncSend(event.getTopic(), event.getPayload(), new SendCallback() {
             @Override
             public void onSuccess(SendResult sendResult) {
@@ -89,6 +95,7 @@ public class OutboxEventService {
         List<OutboxEvent> events = outboxEventMapper.selectList(new LambdaQueryWrapper<OutboxEvent>()
                 .in(OutboxEvent::getStatus, PENDING, FAILED)
                 .le(OutboxEvent::getNextRetryTime, LocalDateTime.now())
+                .lt(OutboxEvent::getRetryCount, properties.getMq().getMaxRetryCount())
                 .last("limit 20"));
         for (OutboxEvent event : events) {
             sendAsync(event);
@@ -121,13 +128,16 @@ public class OutboxEventService {
     }
 
     private void markFailed(Long id, String error) {
+        OutboxEvent event = outboxEventMapper.selectById(id);
+        int nextRetryCount = event == null || event.getRetryCount() == null ? 1 : event.getRetryCount() + 1;
+        String nextStatus = nextRetryCount >= properties.getMq().getMaxRetryCount() ? DEAD_LETTER : FAILED;
         outboxEventMapper.update(null, new LambdaUpdateWrapper<OutboxEvent>()
                 .eq(OutboxEvent::getId, id)
-                .set(OutboxEvent::getStatus, FAILED)
-                .setSql("retry_count = retry_count + 1")
+                .set(OutboxEvent::getStatus, nextStatus)
+                .set(OutboxEvent::getRetryCount, nextRetryCount)
                 .set(OutboxEvent::getNextRetryTime, LocalDateTime.now().plusSeconds(10))
                 .set(OutboxEvent::getErrorMessage, error == null ? "send failed" : error)
                 .set(OutboxEvent::getUpdatedAt, LocalDateTime.now()));
-        log.warn("outbox_failed eventId={} error={}", id, error);
+        log.warn("outbox_failed eventId={} status={} retryCount={} error={}", id, nextStatus, nextRetryCount, error);
     }
 }

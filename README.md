@@ -87,7 +87,7 @@ VITE_API_BASE=http://localhost:8110 npm run dev
 
 ## 面试重点
 
-这个项目不是只做 CRUD，重点是交易系统里的并发和一致性：Vue 3 前端、JWT 无状态登录、RBAC 角色校验、Caffeine + Redis 通用缓存抽象、Redis Lua 预扣、Redisson 用户维度锁、RocketMQ 削峰、Outbox 防消息丢失、MySQL 事务兜底、订单状态机和拼团资格规则链保证幂等与可解释性。Docker Compose 会把 MySQL、Redis、RocketMQ、Vue/Nginx、Prometheus、Grafana 和后端服务一起编排起来。
+这个项目不是只做 CRUD，重点是交易系统里的并发和一致性：Vue 3 前端、JWT 无状态登录、RBAC 角色校验、Caffeine + Redis 通用缓存抽象、Redis Bitmap 布隆过滤器防穿透、商户管理更新 Cache Aside 主动删缓存并通过 MySQL 变更事件兜底、优惠券与拼团 Redis Lua 预扣、拼团活动总库存/单团库存两级控制、Redisson 用户维度锁、Redisson/本地令牌桶限流、RocketMQ 削峰、Outbox 防消息丢失、发送失败定时重试和 DEAD_LETTER 死信状态、RocketMQ 延迟消息处理待支付超时取消并用定时扫描兜底、MySQL 事务兜底、订单状态机、自动库存回补、拼团资格规则链保证幂等与可解释性。拼团 Redis 预占失败时由 MySQL 条件更新最终兜底，数据库事务回滚后通过幂等 Lua 自动回补；Nacos 可以动态调整缓存 TTL、秒杀开关、入口限流 QPS 和订单超时时间；Vue 运营看板支持商户状态/热度管理、策略调整、Prometheus 指标快照和 ELK 日志检索；Docker Compose 会把 MySQL、Redis、RocketMQ、Vue/Nginx、Prometheus、Grafana、ELK 和后端服务一起编排起来。
 
 ## 运营诊断 Agent
 

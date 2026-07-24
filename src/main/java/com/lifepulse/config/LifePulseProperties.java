@@ -13,6 +13,7 @@ public class LifePulseProperties {
     private final Ai ai = new Ai();
     private final Nacos nacos = new Nacos();
     private final Cdc cdc = new Cdc();
+    private final Observability observability = new Observability();
 
     public Jwt getJwt() {
         return jwt;
@@ -36,10 +37,24 @@ public class LifePulseProperties {
 
     public Nacos getNacos() { return nacos; }
     public Cdc getCdc() { return cdc; }
+    public Observability getObservability() { return observability; }
     public static class Cdc {
         private boolean enabled;
         public boolean isEnabled() { return enabled; }
         public void setEnabled(boolean enabled) { this.enabled = enabled; }
+    }
+
+    public static class Observability {
+        private String elasticsearchUrl = "http://localhost:9200";
+        private String prometheusUrl = "http://localhost:9090";
+        private String logIndexPattern = "lifepulse-*";
+
+        public String getElasticsearchUrl() { return elasticsearchUrl; }
+        public void setElasticsearchUrl(String elasticsearchUrl) { this.elasticsearchUrl = elasticsearchUrl; }
+        public String getPrometheusUrl() { return prometheusUrl; }
+        public void setPrometheusUrl(String prometheusUrl) { this.prometheusUrl = prometheusUrl; }
+        public String getLogIndexPattern() { return logIndexPattern; }
+        public void setLogIndexPattern(String logIndexPattern) { this.logIndexPattern = logIndexPattern; }
     }
 
     public static class Nacos {
@@ -92,6 +107,7 @@ public class LifePulseProperties {
 
     public static class Mq {
         private boolean enabled;
+        private int maxRetryCount = 5;
 
         public boolean isEnabled() {
             return enabled;
@@ -99,6 +115,14 @@ public class LifePulseProperties {
 
         public void setEnabled(boolean enabled) {
             this.enabled = enabled;
+        }
+
+        public int getMaxRetryCount() {
+            return maxRetryCount;
+        }
+
+        public void setMaxRetryCount(int maxRetryCount) {
+            this.maxRetryCount = maxRetryCount;
         }
     }
 

@@ -82,7 +82,7 @@
         </div>
         <div class="card-grid">
           <div v-if="shops.length === 0" class="empty-card">暂无推荐商户，先确认后端 `/api/shops` 是否返回数据。</div>
-          <ShopCard v-for="shop in shops" :key="shop.id" :shop="shop" @review="publishReview" />
+          <ShopCard v-for="shop in shops" :key="shop.id" :shop="shop" :can-manage="canViewOperations" @review="publishReview" @toggle-status="toggleShopStatus" @boost="boostShop" />
         </div>
       </section>
 
@@ -93,7 +93,7 @@
         </div>
         <div class="card-grid">
           <div v-if="shops.length === 0" class="empty-card">暂无商户数据。</div>
-          <ShopCard v-for="shop in shops" :key="shop.id" :shop="shop" @review="publishReview" />
+          <ShopCard v-for="shop in shops" :key="shop.id" :shop="shop" :can-manage="canViewOperations" @review="publishReview" @toggle-status="toggleShopStatus" @boost="boostShop" />
         </div>
       </section>
 
@@ -275,6 +275,38 @@
             </div>
             <button class="light block-button" @click="loadDiagnosis">重新诊断</button>
           </div>
+          <form v-if="user.role === 'ADMIN'" class="activity-form" @submit.prevent="savePolicy">
+            <div class="form-heading"><h4>运行策略</h4><span>调整热点入口和订单超时策略</span></div>
+            <label>缓存 TTL（秒）<input v-model.number="policyForm.shopCacheTtlSeconds" type="number" min="30" max="3600"></label>
+            <label>抢券限流 QPS<input v-model.number="policyForm.seckillRateLimitPerSecond" type="number" min="1" max="5000"></label>
+            <label>拼团限流 QPS<input v-model.number="policyForm.groupRateLimitPerSecond" type="number" min="1" max="5000"></label>
+            <label>订单超时（分钟）<input v-model.number="policyForm.orderTimeoutMinutes" type="number" min="1" max="120"></label>
+            <label class="switch-field"><input v-model="policyForm.seckillEnabled" type="checkbox"> 秒杀入口开启</label>
+            <button type="submit">保存策略</button>
+          </form>
+          <div class="assistant-box">
+            <h4>系统指标</h4>
+            <div class="evidence-row metrics-row">
+              <span v-for="(value, key) in metrics" :key="key">{{ key }}：{{ value }}</span>
+              <span v-if="Object.keys(metrics).length === 0">暂无指标数据</span>
+            </div>
+            <button class="light block-button" @click="loadMetrics">刷新指标</button>
+          </div>
+          <div class="assistant-box logs-panel">
+            <h4>日志检索</h4>
+            <form class="log-search" @submit.prevent="loadLogs">
+              <input v-model.trim="logKeyword" placeholder="输入 traceId、订单ID、Outbox 或关键词">
+              <button type="submit">检索</button>
+            </form>
+            <div class="log-list">
+              <div v-if="logs.length === 0" class="empty-card">暂无日志结果。</div>
+              <article v-for="item in logs" :key="`${item.timestamp}-${item.message}`" class="log-item">
+                <strong>{{ item.level || '-' }} {{ item.traceId || '' }}</strong>
+                <span>{{ item.timestamp }}</span>
+                <p>{{ item.message }}</p>
+              </article>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -315,6 +347,16 @@ const activityForm = ref({title:"",description:"",voucherId:1,requiredSize:2,gro
 const orders = ref([]);
 const outbox = ref([]);
 const diagnosis = ref(null);
+const metrics = ref({});
+const logs = ref([]);
+const logKeyword = ref("");
+const policyForm = ref({
+  shopCacheTtlSeconds: 600,
+  seckillEnabled: true,
+  seckillRateLimitPerSecond: 80,
+  groupRateLimitPerSecond: 50,
+  orderTimeoutMinutes: 15
+});
 const qualificationTokens = ref(new Map());
 const toastMessage = ref("");
 const question = ref("");
@@ -536,13 +578,47 @@ async function loadDiagnosis() {
   diagnosis.value = await api("/api/agent/diagnosis");
 }
 
+async function loadMetrics() {
+  metrics.value = await api("/api/agent/metrics");
+}
+
+async function loadLogs() {
+  const keyword = encodeURIComponent(logKeyword.value || "");
+  logs.value = await api(`/api/agent/logs?keyword=${keyword}&size=20`);
+}
+
+async function loadPolicy() {
+  if (user.value.role !== "ADMIN") {
+    return;
+  }
+  try {
+    policyForm.value = await api("/api/admin/policies");
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
+async function savePolicy() {
+  try {
+    policyForm.value = await api("/api/admin/policies", {
+      method: "PUT",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(policyForm.value)
+    });
+    showToast("运行策略已更新");
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
 async function loadAdmin() {
   if (!canViewOperations.value) {
     return;
   }
-  const tasks = [loadDiagnosis()];
+  const tasks = [loadDiagnosis(), loadMetrics(), loadLogs()];
   if (user.value.role === "ADMIN") {
     tasks.push(loadOutbox());
+    tasks.push(loadPolicy());
   } else {
     outbox.value = [];
   }
@@ -561,6 +637,43 @@ async function publishReview(shopId) {
     });
     showToast("评价发布成功，商户缓存已失效");
     await Promise.all([loadShops(), loadStats()]);
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
+async function toggleShopStatus(shop) {
+  if (!canViewOperations.value) {
+    showToast("当前账号无商户管理权限");
+    return;
+  }
+  const nextStatus = shop.status === "OPEN" ? "CLOSED" : "OPEN";
+  try {
+    await api(`/api/shops/${shop.id}`, {
+      method: "PUT",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({status: nextStatus})
+    });
+    showToast(nextStatus === "OPEN" ? "商户已恢复营业，缓存已刷新" : "商户已暂停营业，缓存已刷新");
+    await Promise.all([loadShops(), loadStats(), loadDiagnosis()]);
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
+async function boostShop(shop) {
+  if (!canViewOperations.value) {
+    showToast("当前账号无商户管理权限");
+    return;
+  }
+  try {
+    await api(`/api/shops/${shop.id}`, {
+      method: "PUT",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({hotScore: Number(shop.hotScore || 0) + 50})
+    });
+    showToast("商户热度已更新，缓存已刷新");
+    await Promise.all([loadShops(), loadStats(), loadDiagnosis()]);
   } catch (error) {
     showToast(error.message);
   }
@@ -705,9 +818,13 @@ const ShopCard = {
     shop: {
       type: Object,
       required: true
+    },
+    canManage: {
+      type: Boolean,
+      default: false
     }
   },
-  emits: ["review"],
+  emits: ["review", "toggle-status", "boost"],
   template: `
     <article class="card">
       <div>
@@ -716,6 +833,7 @@ const ShopCard = {
           <span>{{ shop.category }}</span>
           <span>{{ shop.address }}</span>
           <span>评分 {{ shop.avgScore }} / 评价 {{ shop.commentCount }} / 热度 {{ shop.hotScore }}</span>
+          <span>状态 {{ shop.status }}</span>
         </div>
         <div class="tag-row">
           <span class="tag">探店</span>
@@ -724,6 +842,8 @@ const ShopCard = {
       </div>
       <div class="card-actions">
         <button class="light" @click="$emit('review', shop.id)">发布评价</button>
+        <button v-if="canManage" class="light" @click="$emit('boost', shop)">提升热度</button>
+        <button v-if="canManage" @click="$emit('toggle-status', shop)">{{ shop.status === 'OPEN' ? '暂停营业' : '恢复营业' }}</button>
       </div>
     </article>
   `

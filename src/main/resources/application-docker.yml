@@ -42,6 +42,7 @@ lifepulse:
     enabled: true
   mq:
     enabled: true
+    max-retry-count: 5
   seckill:
     token-ttl-seconds: 60
     local-lock-stripes: 64
@@ -55,3 +56,7 @@ lifepulse:
     server-addr: ${LIFEPULSE_NACOS_ADDR:http://nacos:8848}
   cdc:
     enabled: true
+  observability:
+    elasticsearch-url: ${LIFEPULSE_ELASTICSEARCH_URL:http://elasticsearch:9200}
+    prometheus-url: ${LIFEPULSE_PROMETHEUS_URL:http://prometheus:9090}
+    log-index-pattern: ${LIFEPULSE_LOG_INDEX_PATTERN:lifepulse-*}

@@ -6,9 +6,10 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lifepulse.common.BusinessException;
 import com.lifepulse.config.LifePulseProperties;
-import com.lifepulse.config.policy.RuntimePolicy;
+import com.lifepulse.config.dcc.DccValue;
 import com.lifepulse.config.RocketTopics;
 import com.lifepulse.entity.Voucher;
+import com.lifepulse.infrastructure.limit.TrafficLimiterService;
 import com.lifepulse.mapper.VoucherMapper;
 import com.lifepulse.order.OrderProcessor;
 import com.lifepulse.outbox.OutboxEventService;
@@ -61,6 +62,11 @@ public class VoucherService {
     private final ObjectMapper objectMapper;
     private final LifePulseProperties properties;
     private final RedissonClient redissonClient;
+    private final TrafficLimiterService trafficLimiter;
+    @DccValue("seckill-enabled")
+    private volatile boolean seckillEnabled = true;
+    @DccValue("seckill-rate-limit-per-second")
+    private volatile int seckillRateLimitPerSecond = 80;
     private final Map<String, Long> localQualificationTokens = new ConcurrentHashMap<>();
     private final Map<Long, Set<Long>> localRegisteredUsers = new ConcurrentHashMap<>();
     private final ReentrantLock[] localLocks;
@@ -72,7 +78,8 @@ public class VoucherService {
                           StringRedisTemplate redisTemplate,
                           ObjectMapper objectMapper,
                           LifePulseProperties properties,
-                          ObjectProvider<RedissonClient> redissonClientProvider) {
+                          ObjectProvider<RedissonClient> redissonClientProvider,
+                          TrafficLimiterService trafficLimiter) {
         this.voucherMapper = voucherMapper;
         this.voucherBloomFilter = voucherBloomFilter;
         this.outboxEventService = outboxEventService;
@@ -81,6 +88,7 @@ public class VoucherService {
         this.objectMapper = objectMapper;
         this.properties = properties;
         this.redissonClient = redissonClientProvider.getIfAvailable();
+        this.trafficLimiter = trafficLimiter;
         this.localLocks = new ReentrantLock[Math.max(1, properties.getSeckill().getLocalLockStripes())];
         for (int i = 0; i < localLocks.length; i++) {
             localLocks[i] = new ReentrantLock();
@@ -94,6 +102,7 @@ public class VoucherService {
     }
 
     public QualificationResponse applyQualification(Long voucherId, Long userId) {
+        guardSeckillTraffic(voucherId);
         Voucher voucher = requireSellingVoucher(voucherId);
         String token = UUID.randomUUID().toString().replace("-", "");
         if (properties.getRedis().isEnabled()) {
@@ -129,9 +138,10 @@ public class VoucherService {
 
     @Transactional(rollbackFor = Exception.class)
     public EnrollResponse seckill(Long voucherId, Long userId, String qualificationToken) {
-        if (!RuntimePolicy.current().seckillEnabled()) {
+        if (!seckillEnabled) {
             throw new BusinessException("秒杀活动维护中，请稍后再试");
         }
+        guardSeckillTraffic(voucherId);
         Voucher voucher = requireSellingVoucher(voucherId);
         if (qualificationToken == null || qualificationToken.isBlank()) {
             throw new BusinessException("请先申请抢券资格");
@@ -160,6 +170,12 @@ public class VoucherService {
             throw new BusinessException("不在抢券时间内");
         }
         return voucher;
+    }
+
+    private void guardSeckillTraffic(Long voucherId) {
+        if (!trafficLimiter.tryAcquire("voucher:" + voucherId, seckillRateLimitPerSecond)) {
+            throw new BusinessException("当前抢券人数较多，请稍后再试");
+        }
     }
 
     private void checkByRedis(Long voucherId, Long userId, String token) {

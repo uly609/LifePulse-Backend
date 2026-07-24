@@ -40,11 +40,6 @@ management:
       probes:
         enabled: true
 
-rocketmq:
-  name-server: localhost:9876
-  producer:
-    group: lifepulse-producer-group
-
 lifepulse:
   jwt:
     # 本地演示密钥；真实上线放环境变量或配置中心
@@ -54,6 +49,7 @@ lifepulse:
     enabled: false
   mq:
     enabled: false
+    max-retry-count: 5
   seckill:
     token-ttl-seconds: 60
     local-lock-stripes: 64
@@ -67,3 +63,7 @@ lifepulse:
     server-addr: ${LIFEPULSE_NACOS_ADDR:http://localhost:8848}
   cdc:
     enabled: false
+  observability:
+    elasticsearch-url: ${LIFEPULSE_ELASTICSEARCH_URL:http://localhost:9200}
+    prometheus-url: ${LIFEPULSE_PROMETHEUS_URL:http://localhost:9090}
+    log-index-pattern: ${LIFEPULSE_LOG_INDEX_PATTERN:lifepulse-*}

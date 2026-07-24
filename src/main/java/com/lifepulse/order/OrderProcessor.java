@@ -19,11 +19,16 @@ public class OrderProcessor {
     private final DealOrderMapper orderMapper;
     private final VoucherMapper voucherMapper;
     private final IdGenerator idGenerator;
+    private final OrderTimeoutProducer timeoutProducer;
 
-    public OrderProcessor(DealOrderMapper orderMapper, VoucherMapper voucherMapper, IdGenerator idGenerator) {
+    public OrderProcessor(DealOrderMapper orderMapper,
+                          VoucherMapper voucherMapper,
+                          IdGenerator idGenerator,
+                          OrderTimeoutProducer timeoutProducer) {
         this.orderMapper = orderMapper;
         this.voucherMapper = voucherMapper;
         this.idGenerator = idGenerator;
+        this.timeoutProducer = timeoutProducer;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -56,6 +61,7 @@ public class OrderProcessor {
         order.setCreatedAt(now);
         order.setUpdatedAt(now);
         orderMapper.insert(order);
+        timeoutProducer.sendTimeoutAfterCommit(order);
         return order;
     }
 }
